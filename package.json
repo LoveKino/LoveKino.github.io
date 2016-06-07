@@ -1,0 +1,32 @@
+{
+  "name": "ddchensblog",
+  "version": "1.0.0",
+  "description": "ddchen's blog",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LoveKino/LoveKino.github.io.git"
+  },
+  "keywords": [
+    "blog"
+  ],
+  "author": "ddchen",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/LoveKino/LoveKino.github.io/issues"
+  },
+  "homepage": "https://github.com/LoveKino/LoveKino.github.io#readme",
+  "devDependencies": {
+    "babel-loader": "^6.2.4",
+    "babel-preset-es2015": "^6.9.0",
+    "babel-preset-stage-0": "^6.5.0",
+    "css-loader": "^0.23.1",
+    "less": "^2.7.1",
+    "less-loader": "^2.2.3",
+    "style-loader": "^0.13.1",
+    "webpack": "^1.13.1"
+  }
+}
