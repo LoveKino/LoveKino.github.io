@@ -13,7 +13,7 @@ webpackJsonp([0],[
 
 	__webpack_require__(2);
 
-	document.write('ok!');
+	document.write('ddchen\'s blog on progress...');
 
 /***/ },
 /* 2 */
