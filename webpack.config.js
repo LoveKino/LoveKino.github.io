@@ -1,5 +1,7 @@
 var path = require('path');
 var webpack = require('webpack');
+var WebpackMd5Hash = require('webpack-md5-hash');
+var HtmlWebpackPlugin = require('html-webpack-plugin');
 
 module.exports = {
     entry: {
@@ -7,8 +9,8 @@ module.exports = {
         vendor: []
     },
     output: {
-        path: path.resolve(__dirname, 'assert'),
-        filename: '[name].js'
+        path: path.resolve(__dirname, 'assets'),
+        filename: '[name].[chunkhash].js'
     },
     module: {
         loaders: [{
@@ -23,10 +25,15 @@ module.exports = {
         }]
     },
     plugins: [
+        new WebpackMd5Hash(),
         new webpack.optimize.CommonsChunkPlugin({
             name: 'vendor',
-            filename: 'vendor.js',
+            filename: 'vendor.[chunkhash].js',
             minChunks: Infinity
+        }),
+        new HtmlWebpackPlugin({
+            title: 'ddchen\'s blog',
+            filename: __dirname + '/index.html'
         })
     ]
 };
