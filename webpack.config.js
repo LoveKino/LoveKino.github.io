@@ -1,3 +1,5 @@
+'use strict';
+
 var path = require('path');
 var webpack = require('webpack');
 var WebpackMd5Hash = require('webpack-md5-hash');
@@ -33,6 +35,11 @@ module.exports = {
             name: 'vendor',
             filename: 'vendor.[chunkhash].js',
             minChunks: Infinity
+        }),
+        new webpack.optimize.UglifyJsPlugin({
+            compress: {
+                warnings: false
+            }
         }),
         new HtmlWebpackPlugin({
             title: 'ddchen\'s blog',
