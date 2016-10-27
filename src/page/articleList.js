@@ -18,7 +18,8 @@ let articles = require('../../resources/articles.json');
 module.exports = () => {
     let PageView = view(() => {
         return n('div', [
-            header({}),
+            header({
+            }),
             n('div', [
                 map(articles, ({
                     title,

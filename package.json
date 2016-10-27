@@ -44,7 +44,7 @@
     "github-markdown-css": "^2.4.1",
     "install": "^0.8.2",
     "kabanery": "^0.1.0",
-    "kabanery-header": "0.0.1",
+    "kabanery-header": "0.0.2",
     "kabanery-modal": "0.0.1",
     "kabanery-spa": "0.0.2",
     "npm": "^3.10.9",
