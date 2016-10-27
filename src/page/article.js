@@ -10,6 +10,8 @@ let querystring = require('querystring');
 
 let Loading = require('kabanery-modal/lib/loading');
 
+require('!style!css!github-markdown-css/github-markdown.css');
+
 /**
  * display article list
  */
@@ -33,11 +35,26 @@ module.exports = () => {
             update();
         });
 
-        return () => n('div', [
+        return () => n('div', {
+            style: {
+                backgroundColor: 'white',
+                minHeight: '100%'
+            }
+        }, [
             header({
                 back: '?page=articleList'
             }),
-            text ? n('div', [getTextNode(text)]) : null,
+            text ? n('div class="markdown-body"', {
+                style: {
+                    boxSizing: 'border-box',
+                    minWidth: 200,
+                    maxWidth: 980,
+                    margin: '0 auto',
+                    padding: 45
+                }
+            }, [
+                getTextNode(text)
+            ]) : null,
             loading ? Loading({
                 disappear: false
             }) : null

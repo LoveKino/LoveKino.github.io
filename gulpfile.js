@@ -4,6 +4,16 @@ let gulp = require('gulp');
 let spawnp = require('spawnp');
 let marked = require('marked');
 let del = require('del');
+let {
+    map, compact
+} = require('bolzano');
+let promisify = require('promisify-node');
+let fs = promisify('fs');
+let {
+    extname, basename
+} = require('path');
+
+let parseMd = require('./build/parseMd');
 
 marked.setOptions({
     renderer: new marked.Renderer(),
@@ -32,5 +42,24 @@ gulp.task('default', () => {
 });
 
 gulp.task('build-articles', () => {
-    let tokens = marked.lexer('I and using __markdown__');
+    let articlesDir = __dirname + '/resources/src/articles';
+    let outputArticlesDir = __dirname + '/resources/articles';
+    let articleJsonPath = __dirname + '/resources/articles.json';
+
+    return del([outputArticlesDir + '/*']).then(() => map(fs.readdir(articlesDir), (file) => {
+        if (extname(file) !== '.md') return null;
+        return fs.readFile(articlesDir + '/' + file, 'utf-8').then((content) => {
+            let {
+                articleAbbr, html
+            } = parseMd(content);
+            let fileName = basename(file, '.md') + '.html';
+            articleAbbr.path = fileName;
+            // save html to file
+            return fs.writeFile(outputArticlesDir + '/' + fileName, html, 'utf-8').then(() => {
+                return articleAbbr;
+            });
+        });
+    }).then((ret) => Promise.all(ret))).then(compact).then((articleAbbrs) => {
+        return fs.writeFile(articleJsonPath, JSON.stringify(articleAbbrs, null, 4), 'utf-8');
+    });
 });
