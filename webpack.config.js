@@ -14,14 +14,17 @@ module.exports = {
     },
     module: {
         loaders: [{
+            test: /\.json$/,
+            loader: 'json'
+        }, {
             test: /\.jsx?$/,
             loader: 'babel-loader',
             query: {
                 presets: ['es2015', 'stage-0']
             }
         }, {
-            test: /\.less$/, 
-            loader: "style!css!less"
+            test: /\.less$/,
+            loader: 'style!css!less'
         }]
     },
     plugins: [
