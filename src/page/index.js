@@ -19,8 +19,22 @@ module.exports = () => {
     let PageView = view(() => {
         return n('div', [
             header({
+                rightLogos: [
+                    n('div', {
+                        style: {
+                            lineHeight: 40,
+                            paddingLeft: 5,
+                            paddingRight: 5
+                        }
+                    }, 'me')
+                ]
             }),
-            n('div', [
+
+            n('div', {
+                style: {
+                    marginTop: 30
+                }
+            }, [
                 map(articles, ({
                     title,
                     path,
@@ -29,7 +43,8 @@ module.exports = () => {
                 }) => {
                     return n(`div class="card" href="single://?page=article&article=${path}"`, {
                         style: {
-                            width: '40%'
+                            width: '40%',
+                            cursor: 'pointer'
                         }
                     }, [
                         n('h3', title),

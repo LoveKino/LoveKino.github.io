@@ -16,7 +16,7 @@ let {
     router, queryPager
 } = require('kabanery-spa');
 
-let renderArticleList = require('./page/articleList');
+let renderArticleList = require('./page/index');
 let renderArticle = require('./page/article');
 
 document.body.appendChild(n('div id="pager"'));
@@ -24,14 +24,14 @@ document.body.appendChild(n('div id="pager"'));
 let {
     forward, redirect, reload
 } = router(queryPager({
-    'articleList': {
+    'index': {
         render: renderArticleList,
         title: 'article list'
     },
     'article': {
         render: renderArticle
     }
-}, 'articleList'), {
+}, 'index'), {
     forward,
     redirect,
     reload

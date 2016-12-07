@@ -10,10 +10,35 @@ let querystring = require('querystring');
 
 let Loading = require('kabanery-modal/lib/loading');
 
+let {
+    delay
+} = require('jsenhance');
+
 require('!style!css!github-markdown-css/github-markdown.css');
+
+let cache = {};
+
+let getArticle = (articleUrl) => {
+    if (cache[articleUrl]) {
+        return Promise.resolve(cache[articleUrl]);
+    } else {
+        return fetch(articleUrl, {
+            method: 'GET'
+        }).then((response) => {
+            return response.text();
+        }).then((ret) => {
+            cache[articleUrl] = ret;
+            return delay(500).then(() => {
+                return ret;
+            });
+        });
+    }
+};
 
 /**
  * display article list
+ *
+ * TODO cache articles
  */
 module.exports = () => {
     let qs = querystring.parse(window.location.href.split('?')[1]);
@@ -24,16 +49,15 @@ module.exports = () => {
     }, {
         update
     }) => {
-        fetch(`/resources/articles/${qs.article}`, {
-            method: 'GET'
-        }).then((response) => {
-            return response.text();
-        }).then((ret) => {
+        let articleUrl = `/resources/articles/${qs.article}`;
+
+        let updateText = (ret) => {
             text = ret;
             loading = false;
-            // TODO loading disappear animation
             update();
-        });
+        };
+
+        getArticle(articleUrl).then(updateText);
 
         return () => n('div', {
             style: {
@@ -42,7 +66,7 @@ module.exports = () => {
             }
         }, [
             header({
-                back: '?page=articleList'
+                back: '?page=index'
             }),
             text ? n('div class="markdown-body"', {
                 style: {
