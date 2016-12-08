@@ -20,7 +20,7 @@ module.exports = () => {
         return n('div', [
             header({
                 rightLogos: [
-                    n('div', {
+                    n('div href="single://?page=me"', {
                         style: {
                             lineHeight: 40,
                             paddingLeft: 5,
@@ -29,6 +29,28 @@ module.exports = () => {
                     }, 'me')
                 ]
             }),
+
+            n('form', [
+                n('img src="/img/ddchen.jpg"', {
+                    style: {
+                        width: 100
+                    }
+                }),
+                n('h4', 'ddchen'),
+
+                n('p', [
+                    n('span class="fa fa-github"', {
+                        style: {
+                            paddingRight: 10
+                        }
+                    }),
+                    n('a href="https://github.com/LoveKino" target="blank"', {
+                        style: {
+                            color: '#4078c0'
+                        }
+                    }, 'https://github.com/LoveKino')
+                ])
+            ]),
 
             n('div', {
                 style: {

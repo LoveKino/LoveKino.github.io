@@ -26,6 +26,7 @@
     "babel-preset-stage-0": "^6.5.0",
     "css-loader": "^0.23.1",
     "del": "^2.2.2",
+    "extract-text-webpack-plugin": "^1.0.1",
     "gulp": "^3.9.1",
     "html-webpack-plugin": "^2.19.0",
     "json-loader": "^0.5.4",
@@ -35,12 +36,14 @@
     "promisify-node": "^0.4.0",
     "spawnp": "0.0.2",
     "style-loader": "^0.13.1",
+    "url-loader": "^0.5.7",
     "webpack": "^1.13.1",
     "webpack-dev-server": "^1.16.2",
     "webpack-md5-hash": "0.0.5"
   },
   "dependencies": {
     "bolzano": "0.0.4",
+    "font-awesome": "^4.7.0",
     "github-markdown-css": "^2.4.1",
     "install": "^0.8.2",
     "jsenhance": "0.0.2",
