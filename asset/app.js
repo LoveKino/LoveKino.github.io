@@ -60,7 +60,7 @@
 /******/ 	__webpack_require__.p = "";
 /******/
 /******/ 	// Load entry module and return exports
-/******/ 	return __webpack_require__(__webpack_require__.s = 35);
+/******/ 	return __webpack_require__(__webpack_require__.s = 46);
 /******/ })
 /************************************************************************/
 /******/ ([
@@ -296,15 +296,156 @@ module.exports = {
 "use strict";
 
 
+let styles = (...styleObjects) => {
+    return Object.assign({}, ...styleObjects);
+};
+
+let isMapObject = (v) => {
+    return v && typeof v === 'object' && !Array.isArray(v);
+};
+
+let deepMergeMap = (tar, def, path = '', options = {}) => {
+    let blackList = options.blackList || [];
+    if (blackList.findIndex((item) => item === path) !== -1) {
+        return tar;
+    }
+    if (isMapObject(def)) {
+        tar = tar || {};
+        if (isMapObject(tar)) {
+            for (let name in def) {
+                tar[name] = deepMergeMap(tar[name], def[name], path === '' ? name : path + '.' + name, options);
+            }
+        }
+        return tar;
+    } else {
+        if (tar === undefined) return def;
+        return tar;
+    }
+};
+
+let resolveFnValue = (fn, ...args) => {
+    if (typeof fn === 'function') {
+        return resolveFnValue(fn(...args));
+    }
+
+    return fn;
+};
+
+let get = (obj, key = '') => {
+    key = key.trim();
+    let parts = !key ? [] : key.split('.');
+
+    let partLen = parts.length;
+    for (let i = 0; i < partLen; i++) {
+        let part = parts[i].trim();
+        if (part) {
+            obj = obj[part];
+        }
+    }
+
+    return obj;
+};
+
+let set = (obj, key = '', value) => {
+    key = key.trim();
+    let parts = !key ? [] : key.split('.');
+    if (!parts.length) return;
+    let parent = obj;
+
+    for (let i = 0; i < parts.length - 1; i++) {
+        let part = parts[i];
+        part = part.trim();
+        if (part) {
+            let next = parent[part];
+            if (!isObject(next)) {
+                next = {};
+                parent[part] = next;
+            }
+            parent = next;
+        }
+    }
+
+    parent[parts[parts.length - 1]] = value;
+    return obj;
+};
+
+let isObject = (v) => v && typeof v === 'object';
+
+let likeArray = (v) => v && typeof v === 'object' && typeof v.length === 'number';
+
+module.exports = {
+    styles,
+    isMapObject,
+    deepMergeMap,
+    resolveFnValue,
+    get,
+    set,
+    isObject,
+    likeArray
+};
+
+
+/***/ }),
+/* 2 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {
+    n,
+    parseArgs
+} = __webpack_require__(6);
+
+module.exports = (...args) => {
+    let tagName = args[0];
+
+    if (typeof tagName === 'string') {
+        return n(...args);
+    } else { // regard as lumine view
+        let {
+            attributes,
+            childs
+        } = parseArgs(args, {
+            doParseStyle: false
+        });
+
+        return tagName({
+            props: attributes,
+            children: childs
+        });
+    }
+};
+
+
+/***/ }),
+/* 3 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let lumineViewer = __webpack_require__(37);
+
+module.exports = (viewFun, options) => lumineViewer(viewFun)(options);
+
+
+/***/ }),
+/* 4 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
 let {
     isObject, funType, or, isString, isFalsy, likeArray
 } = __webpack_require__(0);
 
-let iterate = __webpack_require__(19);
+let iterate = __webpack_require__(23);
 
 let {
     map, reduce, find, findIndex, forEach, filter, any, exist, compact
-} = __webpack_require__(42);
+} = __webpack_require__(53);
 
 let contain = (list, item, fopts) => findIndex(list, item, fopts) !== -1;
 
@@ -400,368 +541,44 @@ module.exports = {
 
 
 /***/ }),
-/* 2 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-let {
-    view
-} = __webpack_require__(6);
-let steadyTheme = __webpack_require__(97);
-let {
-    deepMergeMap,
-    resolveFnValue
-} = __webpack_require__(5);
-let ClassTable = __webpack_require__(98);
-let {
-    Signal
-} = __webpack_require__(7);
-let JsonTree = __webpack_require__(32);
-let {
-    executeAST
-} = __webpack_require__(14);
-
-/**
- * define the general interface for lumine view
- *
- * 1. unify view data structure
- *
- *    view data = {
- *       // public data
- *       props,
- *       children // child views
- *    }
- *
- *    props.onsigal
- *    props.theme
- *
- * 2. onsignal interface
- *
- *    onsignal: (signal, data, ctx) -> Any
- */
-
-module.exports = (viewFun, {
-    defaultProps = {},
-    defaultChildren = [],
-    theme = steadyTheme,
-    classTable
-} = {}) => {
-    let defaultStyle = defaultProps.style || {};
-
-    let defaultStyleValue = resolveFnValue(defaultStyle, theme);
-    let classTableValue = resolveFnValue(classTable, theme);
-
-    let {
-        appendStyle,
-        getClassName,
-        updateClassTable
-    } = ClassTable(classTableValue);
-
-    return view((viewData, ctx) => {
-        viewData.props = viewData.props || {};
-        viewData.children = (viewData.children && viewData.children.length) ? viewData.children : defaultChildren;
-        viewData.props.theme = viewData.props.theme || theme;
-
-        appendStyle();
-        // TODO check view Data
-
-        // update defaultStyleValue
-        if (viewData.props.theme && typeof defaultStyle === 'function') {
-            defaultStyleValue = resolveFnValue(defaultStyle, viewData.props.theme);
-        }
-
-        // update class table
-        if (viewData.theme && typeof classTable === 'function') {
-            classTableValue = resolveFnValue(classTable, viewData.props.theme);
-            updateClassTable(classTableValue);
-        }
-
-        // merge props (deep merge)
-        viewData.props.style = deepMergeMap(viewData.props.style, defaultStyleValue);
-        viewData.props = deepMergeMap(viewData.props, defaultProps);
-
-        // signal system
-        let notify = (signal) => {
-            viewData.props.onsignal && viewData.props.onsignal(signal, ctx.getData(), ctx);
-        };
-
-        let viewDataTree = JsonTree(viewData);
-
-        // update with tree script
-        let updateTree = ({
-            ast,
-            variableStub
-        }, variableMap, signal) => {
-            signal = signal || Signal('update-view-data');
-            // update view data by running update script
-            executeAST(ast, {
-                queryByPath: viewDataTree.queryByPath,
-                setByPath: viewDataTree.setByPath,
-                removeByPath: viewDataTree.removeByPath,
-                appendByPath: viewDataTree.appendByPath,
-                variableMap,
-                variableStub
-            });
-            updateWithNotify(signal);
-        };
-
-        let updateWithNotify = (signal, ...updateScript) => {
-            signal = signal || Signal('update-view-data');
-            ctx.update(...updateScript);
-            // notify
-            notify(signal);
-        };
-
-        ctx.notify = notify;
-        ctx.updateWithNotify = updateWithNotify;
-        ctx.updateTree = updateTree;
-        ctx.getClassName = getClassName;
-
-        return viewFun(viewData, ctx);
-    });
-};
-
-
-/***/ }),
-/* 3 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-let {
-    n,
-    parseArgs
-} = __webpack_require__(6);
-
-module.exports = (...args) => {
-    let tagName = args[0];
-
-    if (typeof tagName === 'string') {
-        return n(...args);
-    } else {
-        let {
-            attributes,
-            childs
-        } = parseArgs(args, {
-            doParseStyle: false
-        });
-
-        return tagName({
-            props: attributes,
-            children: childs
-        });
-    }
-};
-
-
-/***/ }),
-/* 4 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-let {
-    isObject, funType, or, isString, isFalsy, likeArray
-} = __webpack_require__(0);
-
-let iterate = __webpack_require__(30);
-
-let {
-    map, reduce, find, findIndex, forEach, filter, any, exist, compact, reverse, overArgs
-} = __webpack_require__(80);
-
-let contain = (list, item, fopts) => findIndex(list, item, fopts) !== -1;
-
-let difference = (list1, list2, fopts) => {
-    return reduce(list1, (prev, item) => {
-        if (!contain(list2, item, fopts) &&
-            !contain(prev, item, fopts)) {
-            prev.push(item);
-        }
-        return prev;
-    }, []);
-};
-
-let union = (list1, list2, fopts) => deRepeat(list2, fopts, deRepeat(list1, fopts));
-
-let mergeMap = (map1 = {}, map2 = {}) => reduce(map2, setValueKey, reduce(map1, setValueKey, {}));
-
-let setValueKey = (obj, value, key) => {
-    obj[key] = value;
-    return obj;
-};
-
-let interset = (list1, list2, fopts) => {
-    return reduce(list1, (prev, cur) => {
-        if (contain(list2, cur, fopts)) {
-            prev.push(cur);
-        }
-        return prev;
-    }, []);
-};
-
-let deRepeat = (list, fopts, init = []) => {
-    return reduce(list, (prev, cur) => {
-        if (!contain(prev, cur, fopts)) {
-            prev.push(cur);
-        }
-        return prev;
-    }, init);
-};
-
-/**
- * a.b.c
- */
-let get = funType((sandbox, name = '') => {
-    name = name.trim();
-    let parts = !name ? [] : name.split('.');
-    return reduce(parts, getValue, sandbox, invertLogic);
-}, [
-    isObject,
-    or(isString, isFalsy)
-]);
-
-let getValue = (obj, key) => obj[key];
-
-let invertLogic = v => !v;
-
-let delay = (time) => new Promise((resolve) => {
-    setTimeout(resolve, time);
-});
-
-let flat = (list) => {
-    if (likeArray(list) && !isString(list)) {
-        return reduce(list, (prev, item) => {
-            prev = prev.concat(flat(item));
-            return prev;
-        }, []);
-    } else {
-        return [list];
-    }
-};
-
-module.exports = {
-    flat,
-    contain,
-    difference,
-    union,
-    interset,
-    map,
-    reduce,
-    iterate,
-    find,
-    findIndex,
-    deRepeat,
-    forEach,
-    filter,
-    any,
-    exist,
-    get,
-    delay,
-    mergeMap,
-    compact,
-    reverse,
-    overArgs
-};
-
-
-/***/ }),
 /* 5 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let styles = (...styleObjects) => {
-    return Object.assign({}, ...styleObjects);
+let Signal = (type, data) => {
+    return {
+        type,
+        data
+    };
 };
 
-let isMapObject = (v) => {
-    return v && typeof v === 'object' && !Array.isArray(v);
+let isSignalType = (s, type) => {
+    return s.type === type;
 };
 
-let deepMergeMap = (tar, def, path = '', options = {}) => {
-    let blackList = options.blackList || [];
-    if (blackList.findIndex((item) => item === path) !== -1) {
-        return tar;
-    }
-    if (isMapObject(def)) {
-        tar = tar || {};
-        if (isMapObject(tar)) {
-            for (let name in def) {
-                tar[name] = deepMergeMap(tar[name], def[name], path === '' ? name : path + '.' + name, options);
-            }
-        }
-        return tar;
-    } else {
-        if (tar === undefined) return def;
-        return tar;
+let onSignalType = (expectType, fn) => (signal, ...rest) => {
+    if (isSignalType(signal, expectType)) {
+        return fn(signal, ...rest);
     }
 };
 
-let resolveFnValue = (fn, ...args) => {
-    if (typeof fn === 'function') {
-        return resolveFnValue(fn(...args));
-    }
-
-    return fn;
+let deliver = (ctx, type, extra) => (sourceSignal, sourceData, sourceCtx) => {
+    ctx.notify(Signal(type, {
+        sourceType: 'delivered',
+        sourceSignal,
+        sourceData,
+        sourceCtx,
+        extra
+    }));
 };
-
-let get = (obj, key = '') => {
-    key = key.trim();
-    let parts = !key ? [] : key.split('.');
-
-    let partLen = parts.length;
-    for (let i = 0; i < partLen; i++) {
-        let part = parts[i].trim();
-        if (part) {
-            obj = obj[part];
-        }
-    }
-
-    return obj;
-};
-
-let set = (obj, key = '', value) => {
-    key = key.trim();
-    let parts = !key ? [] : key.split('.');
-    if (!parts.length) return;
-    let parent = obj;
-
-    for (let i = 0; i < parts.length - 1; i++) {
-        let part = parts[i];
-        part = part.trim();
-        if (part) {
-            let next = parent[part];
-            if (!isObject(next)) {
-                next = {};
-                parent[part] = next;
-            }
-            parent = next;
-        }
-    }
-
-    parent[parts[parts.length - 1]] = value;
-    return obj;
-};
-
-let isObject = (v) => v && typeof v === 'object';
-
-let likeArray = (v) => v && typeof v === 'object' && typeof v.length === 'number';
 
 module.exports = {
-    styles,
-    isMapObject,
-    deepMergeMap,
-    resolveFnValue,
-    get,
-    set,
-    isObject,
-    likeArray
+    Signal,
+    onSignalType,
+    isSignalType,
+    deliver
 };
 
 
@@ -772,7 +589,7 @@ module.exports = {
 "use strict";
 
 
-module.exports = __webpack_require__(41);
+module.exports = __webpack_require__(52);
 
 /**
  * @readme-doc
@@ -884,38 +701,108 @@ module.exports = __webpack_require__(41);
 "use strict";
 
 
-let Signal = (type, data) => {
-    return {
-        type,
-        data
-    };
+let {
+    isObject, funType, or, isString, isFalsy, likeArray
+} = __webpack_require__(0);
+
+let iterate = __webpack_require__(33);
+
+let {
+    map, reduce, find, findIndex, forEach, filter, any, exist, compact, reverse, overArgs
+} = __webpack_require__(91);
+
+let contain = (list, item, fopts) => findIndex(list, item, fopts) !== -1;
+
+let difference = (list1, list2, fopts) => {
+    return reduce(list1, (prev, item) => {
+        if (!contain(list2, item, fopts) &&
+            !contain(prev, item, fopts)) {
+            prev.push(item);
+        }
+        return prev;
+    }, []);
 };
 
-let isSignalType = (s, type) => {
-    return s.type === type;
+let union = (list1, list2, fopts) => deRepeat(list2, fopts, deRepeat(list1, fopts));
+
+let mergeMap = (map1 = {}, map2 = {}) => reduce(map2, setValueKey, reduce(map1, setValueKey, {}));
+
+let setValueKey = (obj, value, key) => {
+    obj[key] = value;
+    return obj;
 };
 
-let onSignalType = (expectType, fn) => (signal, ...rest) => {
-    if (isSignalType(signal, expectType)) {
-        return fn(signal, ...rest);
+let interset = (list1, list2, fopts) => {
+    return reduce(list1, (prev, cur) => {
+        if (contain(list2, cur, fopts)) {
+            prev.push(cur);
+        }
+        return prev;
+    }, []);
+};
+
+let deRepeat = (list, fopts, init = []) => {
+    return reduce(list, (prev, cur) => {
+        if (!contain(prev, cur, fopts)) {
+            prev.push(cur);
+        }
+        return prev;
+    }, init);
+};
+
+/**
+ * a.b.c
+ */
+let get = funType((sandbox, name = '') => {
+    name = name.trim();
+    let parts = !name ? [] : name.split('.');
+    return reduce(parts, getValue, sandbox, invertLogic);
+}, [
+    isObject,
+    or(isString, isFalsy)
+]);
+
+let getValue = (obj, key) => obj[key];
+
+let invertLogic = v => !v;
+
+let delay = (time) => new Promise((resolve) => {
+    setTimeout(resolve, time);
+});
+
+let flat = (list) => {
+    if (likeArray(list) && !isString(list)) {
+        return reduce(list, (prev, item) => {
+            prev = prev.concat(flat(item));
+            return prev;
+        }, []);
+    } else {
+        return [list];
     }
 };
 
-let deliver = (ctx, type, extra) => (sourceSignal, sourceData, sourceCtx) => {
-    ctx.notify(Signal(type, {
-        sourceType: 'delivered',
-        sourceSignal,
-        sourceData,
-        sourceCtx,
-        extra
-    }));
-};
-
 module.exports = {
-    Signal,
-    onSignalType,
-    isSignalType,
-    deliver
+    flat,
+    contain,
+    difference,
+    union,
+    interset,
+    map,
+    reduce,
+    iterate,
+    find,
+    findIndex,
+    deRepeat,
+    forEach,
+    filter,
+    any,
+    exist,
+    get,
+    delay,
+    mergeMap,
+    compact,
+    reverse,
+    overArgs
 };
 
 
@@ -928,7 +815,7 @@ module.exports = {
 
 let {
     reduce
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 let {
     funType, isObject, or, isString, isFalsy
 } = __webpack_require__(0);
@@ -1119,7 +1006,7 @@ module.exports = {
  * console.log(m('"').type === MATCH);
  *
  **/
-module.exports = __webpack_require__(68);
+module.exports = __webpack_require__(79);
 
 
 /***/ }),
@@ -1131,14 +1018,14 @@ module.exports = __webpack_require__(68);
 
 let {
     map
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 let {
     isObject, isNode
 } = __webpack_require__(0);
 
-let parseArgs = __webpack_require__(43);
+let parseArgs = __webpack_require__(54);
 
-let parseStyle = __webpack_require__(20);
+let parseStyle = __webpack_require__(24);
 
 const KABANERY_NODE = 'kabanery_node';
 
@@ -1246,7 +1133,7 @@ module.exports = {
 "use strict";
 
 
-let uuidv4 = __webpack_require__(21);
+let uuidv4 = __webpack_require__(25);
 
 let seed = uuidv4();
 
@@ -1266,7 +1153,7 @@ module.exports = {
 
 let {
     createElement, createSvgElement
-} = __webpack_require__(54);
+} = __webpack_require__(65);
 
 let {
     bindEvents
@@ -1274,7 +1161,7 @@ let {
 
 let {
     map
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
 let {
     isKabaneryNode
@@ -1306,7 +1193,7 @@ module.exports = reduceNode;
 "use strict";
 
 
-let EventMatrix = __webpack_require__(55);
+let EventMatrix = __webpack_require__(66);
 
 let {
     eventMapHook
@@ -1340,11 +1227,22 @@ module.exports = {
 /* 14 */
 /***/ (function(module, exports, __webpack_require__) {
 
-module.exports = __webpack_require__(65);
+"use strict";
+
+
+exports.decode = exports.parse = __webpack_require__(68);
+exports.encode = exports.stringify = __webpack_require__(69);
 
 
 /***/ }),
 /* 15 */
+/***/ (function(module, exports, __webpack_require__) {
+
+module.exports = __webpack_require__(76);
+
+
+/***/ }),
+/* 16 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1358,7 +1256,7 @@ module.exports = {
 
 
 /***/ }),
-/* 16 */
+/* 17 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1366,7 +1264,7 @@ module.exports = {
 
 let {
     reduce
-} = __webpack_require__(4);
+} = __webpack_require__(7);
 
 /**
  *
@@ -1445,7 +1343,7 @@ module.exports = {
 
 
 /***/ }),
-/* 17 */
+/* 18 */
 /***/ (function(module, exports) {
 
 module.exports = {
@@ -1497,15 +1395,145 @@ module.exports = {
 
 
 /***/ }),
-/* 18 */
+/* 19 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let shadowFrame = __webpack_require__(39);
+module.exports = {
+    //DO_SAVE_DATA: 'doSaveData'
+}
 
-let startMomenter = __webpack_require__(40);
+/***/ }),
+/* 20 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {
+    get,
+    set
+} = __webpack_require__(1);
+
+let {
+    Signal
+} = __webpack_require__(5);
+
+const CHILD_SOURCE_TYPE = 'child';
+
+const identity = v => v;
+
+/**
+ * binding view with another view's props through a key map
+ *
+ * keyMap = {
+ *    binderKey: bindedKey
+ * }
+ */
+
+let syncBindWithKeyMap = (ctx, keyMap, {
+    bindedProps = {},
+    stopSignal,
+    autoUpdate = false,
+    updatedSignalTypes = null,
+    onChildSignal,
+    toBinded = identity,
+    toBinder = identity
+} = {}) => {
+    // TODO check
+
+    let viewData = ctx.getData();
+    let props = viewData.props;
+    let mappings = [];
+    for (let binderKey in keyMap) {
+        mappings.push([binderKey, keyMap[binderKey]]);
+    }
+
+    let mapedPropsValue = mappings.reduce((prev, [binderKey, bindedKey]) => {
+        let propValue = get(props, binderKey); // get from binder
+        set(prev, bindedKey, toBinded(propValue, binderKey, bindedKey)); // set for binded
+        return prev;
+    }, {});
+
+    let onsignal = (signal, data, sourceCtx) => {
+        // when event happened, sync the data
+        mappings.forEach(([binderKey, bindedKey]) => {
+            let propValue = get(data.props, bindedKey); // get from child
+            set(props, binderKey, toBinder(propValue, binderKey, bindedKey)); // set for parent
+        });
+
+        // handle the signal if necessary
+        onChildSignal && onChildSignal(signal, data, sourceCtx);
+
+        if (!stopSignal) {
+            // pop up the signal, TODO wrap the sigal to resolve chain
+            ctx.notify(
+                Signal(signal.type, {
+                    sourceType: CHILD_SOURCE_TYPE,
+                    keyMap,
+                    sourceSignal: signal,
+                    sourceData: data,
+                    sourceCtx
+                })
+            );
+        }
+
+        if (autoUpdate) {
+            if (!updatedSignalTypes) {
+                ctx.update(); // update binder view
+            } else {
+                if (updatedSignalTypes.findIndex((type) => type === signal.type) !== -1) {
+                    ctx.update(); // update binder view
+                }
+            }
+        }
+    };
+
+    // construct child props
+    return Object.assign({
+        theme: props.theme // extend theme by default
+    }, bindedProps, mapedPropsValue, {
+        onsignal
+    });
+};
+
+module.exports = {
+    syncBindWithKeyMap
+};
+
+
+/***/ }),
+/* 21 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {n} = __webpack_require__(6);
+let lumineView = __webpack_require__(3);
+let {styles} = __webpack_require__(1);
+
+module.exports = lumineView(({props, children}) => {
+  return n('div', {style : props.style}, children);
+}, {
+  defaultProps : {style : (theme) => styles(theme.fullParent)},
+
+  defaultChildren : [ '' ]
+});
+
+
+/***/ }),
+/* 22 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let shadowFrame = __webpack_require__(50);
+
+let startMomenter = __webpack_require__(51);
 
 let getX = (elem) => {
     var x = 0;
@@ -1588,7 +1616,7 @@ module.exports = {
 
 
 /***/ }),
-/* 19 */
+/* 23 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1695,7 +1723,7 @@ module.exports = iterate;
 
 
 /***/ }),
-/* 20 */
+/* 24 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1761,11 +1789,11 @@ let convertStyleValue = (value, key) => {
 
 
 /***/ }),
-/* 21 */
+/* 25 */
 /***/ (function(module, exports, __webpack_require__) {
 
-var rng = __webpack_require__(50);
-var bytesToUuid = __webpack_require__(52);
+var rng = __webpack_require__(61);
+var bytesToUuid = __webpack_require__(63);
 
 function v4(options, buf, offset) {
   var i = buf && offset || 0;
@@ -1796,7 +1824,7 @@ module.exports = v4;
 
 
 /***/ }),
-/* 22 */
+/* 26 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1812,7 +1840,7 @@ let {
 
 let {
     flat, forEach
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
 let reduceNode = __webpack_require__(12);
 
@@ -1843,18 +1871,7 @@ let getDoc = (node) => {
 
 
 /***/ }),
-/* 23 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-exports.decode = exports.parse = __webpack_require__(57);
-exports.encode = exports.stringify = __webpack_require__(58);
-
-
-/***/ }),
-/* 24 */
+/* 27 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -1896,11 +1913,11 @@ exports.encode = exports.stringify = __webpack_require__(58);
  * console.log('\n');
  * console.log(tokens3);
  */
-module.exports = __webpack_require__(67);
+module.exports = __webpack_require__(78);
 
 
 /***/ }),
-/* 25 */
+/* 28 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2003,7 +2020,7 @@ module.exports = {
 
 
 /***/ }),
-/* 26 */
+/* 29 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2013,11 +2030,11 @@ let {
     isObject, funType, or, isString, isFalsy, likeArray
 } = __webpack_require__(0);
 
-let iterate = __webpack_require__(27);
+let iterate = __webpack_require__(30);
 
 let {
     map, reduce, find, findIndex, forEach, filter, any, exist, compact, reverse, overArgs
-} = __webpack_require__(72);
+} = __webpack_require__(83);
 
 let contain = (list, item, fopts) => findIndex(list, item, fopts) !== -1;
 
@@ -2111,186 +2128,6 @@ module.exports = {
     compact,
     reverse,
     overArgs
-};
-
-
-/***/ }),
-/* 27 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-let {
-    isPromise, likeArray, isObject, funType, isFunction, isUndefined, or, isNumber, isFalsy, isReadableStream, mapType
-} = __webpack_require__(0);
-
-/**
- * @param opts
- *      preidcate: chose items to iterate
- *      limit: when to stop iteration
- *      transfer: transfer item
- *      output
- *      def: default result
- */
-let iterate = funType((domain, opts = {}) => {
-    domain = domain || [];
-    if (isPromise(domain)) {
-        return domain.then(list => {
-            return iterate(list, opts);
-        });
-    }
-    return iterateList(domain, opts);
-}, [
-    or(isPromise, isObject, isFunction, isFalsy),
-    or(isUndefined, mapType({
-        predicate: or(isFunction, isFalsy),
-        transfer: or(isFunction, isFalsy),
-        output: or(isFunction, isFalsy),
-        limit: or(isUndefined, isNumber, isFunction)
-    }))
-]);
-
-let iterateList = (domain, opts) => {
-    opts = initOpts(opts, domain);
-
-    let rets = opts.def;
-    let count = 0; // iteration times
-
-    if (isReadableStream(domain)) {
-        let index = -1;
-
-        return new Promise((resolve, reject) => {
-            domain.on('data', (chunk) => {
-                // TODO try cache error
-                let itemRet = iterateItem(chunk, domain, ++index, count, rets, opts);
-                rets = itemRet.rets;
-                count = itemRet.count;
-                if (itemRet.stop) {
-                    resolve(rets);
-                }
-            });
-            domain.on('end', () => {
-                resolve(rets);
-            });
-            domain.on('error', (err) => {
-                reject(err);
-            });
-        });
-    } else if (likeArray(domain)) {
-        for (let i = 0; i < domain.length; i++) {
-            let item = domain[i];
-            let itemRet = iterateItem(item, domain, i, count, rets, opts);
-            rets = itemRet.rets;
-            count = itemRet.count;
-            if (itemRet.stop) return rets;
-        }
-    } else if (isObject(domain)) {
-        for (let name in domain) {
-            let item = domain[name];
-            let itemRet = iterateItem(item, domain, name, count, rets, opts);
-            rets = itemRet.rets;
-            count = itemRet.count;
-            if (itemRet.stop) return rets;
-        }
-    }
-
-    return rets;
-};
-
-let initOpts = (opts, domain) => {
-    let {
-        predicate, transfer, output, limit
-    } = opts;
-
-    opts.predicate = predicate || truthy;
-    opts.transfer = transfer || id;
-    opts.output = output || toList;
-    if (limit === undefined) limit = domain && domain.length;
-    limit = opts.limit = stopCondition(limit);
-    return opts;
-};
-
-let iterateItem = (item, domain, name, count, rets, {
-    predicate, transfer, output, limit
-}) => {
-    if (limit(rets, item, name, domain, count)) {
-        // stop
-        return {
-            stop: true,
-            count,
-            rets
-        };
-    }
-
-    if (predicate(item)) {
-        rets = output(rets, transfer(item, name, domain, rets), name, domain);
-        count++;
-    }
-    return {
-        stop: false,
-        count,
-        rets
-    };
-};
-
-let stopCondition = (limit) => {
-    if (isUndefined(limit)) {
-        return falsy;
-    } else if (isNumber(limit)) {
-        return (rets, item, name, domain, count) => count >= limit;
-    } else {
-        return limit;
-    }
-};
-
-let toList = (prev, v) => {
-    prev.push(v);
-    return prev;
-};
-
-let truthy = () => true;
-
-let falsy = () => false;
-
-let id = v => v;
-
-module.exports = {
-    iterate
-};
-
-
-/***/ }),
-/* 28 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-let assembleToken = (tokenType, prefix) => {
-    return {
-        tokenType,
-        name: tokenType.name,
-        text: prefix
-    };
-};
-
-module.exports = {
-    assembleToken
-};
-
-
-/***/ }),
-/* 29 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-module.exports = {
-    END_SYMBOL: '$',
-    EXPAND_START_SYMBOL: 'S`',
-    EPSILON: null
 };
 
 
@@ -2442,6 +2279,186 @@ module.exports = {
 
 /***/ }),
 /* 31 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let assembleToken = (tokenType, prefix) => {
+    return {
+        tokenType,
+        name: tokenType.name,
+        text: prefix
+    };
+};
+
+module.exports = {
+    assembleToken
+};
+
+
+/***/ }),
+/* 32 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = {
+    END_SYMBOL: '$',
+    EXPAND_START_SYMBOL: 'S`',
+    EPSILON: null
+};
+
+
+/***/ }),
+/* 33 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {
+    isPromise, likeArray, isObject, funType, isFunction, isUndefined, or, isNumber, isFalsy, isReadableStream, mapType
+} = __webpack_require__(0);
+
+/**
+ * @param opts
+ *      preidcate: chose items to iterate
+ *      limit: when to stop iteration
+ *      transfer: transfer item
+ *      output
+ *      def: default result
+ */
+let iterate = funType((domain, opts = {}) => {
+    domain = domain || [];
+    if (isPromise(domain)) {
+        return domain.then(list => {
+            return iterate(list, opts);
+        });
+    }
+    return iterateList(domain, opts);
+}, [
+    or(isPromise, isObject, isFunction, isFalsy),
+    or(isUndefined, mapType({
+        predicate: or(isFunction, isFalsy),
+        transfer: or(isFunction, isFalsy),
+        output: or(isFunction, isFalsy),
+        limit: or(isUndefined, isNumber, isFunction)
+    }))
+]);
+
+let iterateList = (domain, opts) => {
+    opts = initOpts(opts, domain);
+
+    let rets = opts.def;
+    let count = 0; // iteration times
+
+    if (isReadableStream(domain)) {
+        let index = -1;
+
+        return new Promise((resolve, reject) => {
+            domain.on('data', (chunk) => {
+                // TODO try cache error
+                let itemRet = iterateItem(chunk, domain, ++index, count, rets, opts);
+                rets = itemRet.rets;
+                count = itemRet.count;
+                if (itemRet.stop) {
+                    resolve(rets);
+                }
+            });
+            domain.on('end', () => {
+                resolve(rets);
+            });
+            domain.on('error', (err) => {
+                reject(err);
+            });
+        });
+    } else if (likeArray(domain)) {
+        for (let i = 0; i < domain.length; i++) {
+            let item = domain[i];
+            let itemRet = iterateItem(item, domain, i, count, rets, opts);
+            rets = itemRet.rets;
+            count = itemRet.count;
+            if (itemRet.stop) return rets;
+        }
+    } else if (isObject(domain)) {
+        for (let name in domain) {
+            let item = domain[name];
+            let itemRet = iterateItem(item, domain, name, count, rets, opts);
+            rets = itemRet.rets;
+            count = itemRet.count;
+            if (itemRet.stop) return rets;
+        }
+    }
+
+    return rets;
+};
+
+let initOpts = (opts, domain) => {
+    let {
+        predicate, transfer, output, limit
+    } = opts;
+
+    opts.predicate = predicate || truthy;
+    opts.transfer = transfer || id;
+    opts.output = output || toList;
+    if (limit === undefined) limit = domain && domain.length;
+    limit = opts.limit = stopCondition(limit);
+    return opts;
+};
+
+let iterateItem = (item, domain, name, count, rets, {
+    predicate, transfer, output, limit
+}) => {
+    if (limit(rets, item, name, domain, count)) {
+        // stop
+        return {
+            stop: true,
+            count,
+            rets
+        };
+    }
+
+    if (predicate(item)) {
+        rets = output(rets, transfer(item, name, domain, rets), name, domain);
+        count++;
+    }
+    return {
+        stop: false,
+        count,
+        rets
+    };
+};
+
+let stopCondition = (limit) => {
+    if (isUndefined(limit)) {
+        return falsy;
+    } else if (isNumber(limit)) {
+        return (rets, item, name, domain, count) => count >= limit;
+    } else {
+        return limit;
+    }
+};
+
+let toList = (prev, v) => {
+    prev.push(v);
+    return prev;
+};
+
+let truthy = () => true;
+
+let falsy = () => false;
+
+let id = v => v;
+
+module.exports = {
+    iterate
+};
+
+
+/***/ }),
+/* 34 */
 /***/ (function(module, exports) {
 
 let getProductionId = (production) => {
@@ -2486,7 +2503,7 @@ module.exports = {
 
 
 /***/ }),
-/* 32 */
+/* 35 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2499,7 +2516,7 @@ let {
     modifySuccess,
     removeNoneExist,
     removeSuccess
-} = __webpack_require__(91);
+} = __webpack_require__(102);
 
 module.exports = (jsonData, {
     missingValue = undefined
@@ -2563,247 +2580,49 @@ module.exports = (jsonData, {
 
 
 /***/ }),
-/* 33 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-module.exports = {
-    //DO_SAVE_DATA: 'doSaveData'
-}
-
-/***/ }),
-/* 34 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-let {
-    get,
-    set
-} = __webpack_require__(5);
-
-let {
-    Signal
-} = __webpack_require__(7);
-
-const CHILD_SOURCE_TYPE = 'child';
-
-const identity = v => v;
-
-/**
- * binding view with another view's props through a key map
- *
- * keyMap = {
- *    binderKey: bindedKey
- * }
- */
-
-let syncBindWithKeyMap = (ctx, keyMap, {
-    bindedProps = {},
-    stopSignal,
-    autoUpdate = false,
-    updatedSignalTypes = null,
-    onChildSignal,
-    toBinded = identity,
-    toBinder = identity
-} = {}) => {
-    // TODO check
-
-    let viewData = ctx.getData();
-    let props = viewData.props;
-    let mappings = [];
-    for (let binderKey in keyMap) {
-        mappings.push([binderKey, keyMap[binderKey]]);
-    }
-
-    let mapedPropsValue = mappings.reduce((prev, [binderKey, bindedKey]) => {
-        let propValue = get(props, binderKey); // get from binder
-        set(prev, bindedKey, toBinded(propValue, binderKey, bindedKey)); // set for binded
-        return prev;
-    }, {});
-
-    let onsignal = (signal, data, sourceCtx) => {
-        // when event happened, sync the data
-        mappings.forEach(([binderKey, bindedKey]) => {
-            let propValue = get(data.props, bindedKey); // get from child
-            set(props, binderKey, toBinder(propValue, binderKey, bindedKey)); // set for parent
-        });
-
-        // handle the signal if necessary
-        onChildSignal && onChildSignal(signal, data, sourceCtx);
-
-        if (!stopSignal) {
-            // pop up the signal, TODO wrap the sigal to resolve chain
-            ctx.notify(
-                Signal(signal.type, {
-                    sourceType: CHILD_SOURCE_TYPE,
-                    keyMap,
-                    sourceSignal: signal,
-                    sourceData: data,
-                    sourceCtx
-                })
-            );
-        }
-
-        if (autoUpdate) {
-            if (!updatedSignalTypes) {
-                ctx.update(); // update binder view
-            } else {
-                if (updatedSignalTypes.findIndex((type) => type === signal.type) !== -1) {
-                    ctx.update(); // update binder view
-                }
-            }
-        }
-    };
-
-    // construct child props
-    return Object.assign({
-        theme: props.theme // extend theme by default
-    }, bindedProps, mapedPropsValue, {
-        onsignal
-    });
-};
-
-module.exports = {
-    syncBindWithKeyMap
-};
-
-
-/***/ }),
-/* 35 */
-/***/ (function(module, exports, __webpack_require__) {
-
-"use strict";
-
-
-let {SPA} = __webpack_require__(36);
-let pageSignalActionMap = __webpack_require__(93);
-let pageViewMap = __webpack_require__(94);
-
-SPA({
-  pageViewMap,
-  pageSignalActionMap,
-  pageOptionsMap : {},
-  defaultPage : 'indexPage'
-});
-
-
-/***/ }),
 /* 36 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let {
-    router,
-    queryPager
-} = __webpack_require__(37);
-let {
-    mount
-} = __webpack_require__(6);
-let n = __webpack_require__(3);
-let pfcApis = __webpack_require__(59);
-let {
-    signalActionFlow
-} = __webpack_require__(63);
-let {
-    Signal
-} = __webpack_require__(7);
-let {
-    wrapPagePropsWithStore
-} = __webpack_require__(92);
+let lumineView = __webpack_require__(3);
+let n = __webpack_require__(2);
+let PageLoading = __webpack_require__(113);
+let Notice = __webpack_require__(118);
+let {syncBindWithKeyMap} = __webpack_require__(20);
+let Full = __webpack_require__(21);
 
-const PAGE_RENDER_SIGNAL = 'kabanery_page_render';
+/**
+ *
+ * define a simple page view class, which contains page loading and notice.
+ */
 
-let SPA = ({
-    apiPath = '/api/pfc',
-    apiStub = {},
-    containerId = 'pager',
+module.exports = (PageView) => {
+  let fun = ({props, children}, ctx) => {
+    return n(Full, {style : props.style.container}, [
+      n(PageLoading,
+        syncBindWithKeyMap(ctx, {'loading.show' : 'show'},
+                           {bindedProps : {style : props.style.loading}})),
 
-    // page configs
-    pageViewMap = {},
-    pageSignalActionMap = {},
-    pageOptionsMap = {},
+      n(Notice, syncBindWithKeyMap(
+                    ctx, {'notice.show' : 'show', 'notice.text' : 'text'},
+                    {bindedProps : {style : props.style.notice}})),
 
-    defaultPage
-}) => {
-    // TODO validate params
-    let {
-        apiMap,
-        runApi
-    } = pfcApis(apiPath, apiStub);
+      n(PageView, props, children)
+    ]);
+  };
 
-    // create page map
-    let pageMap = {};
+  return lumineView(fun, {
+    defaultProps : {
+      // loading in page level
+      loading : {show : false},
+      // notice window
+      notice : {show : false, text : ''},
 
-    for (let name in pageViewMap) {
-        let options = pageOptionsMap[name] || {};
-        let PageView = pageViewMap[name];
-        let signalActionMap = pageSignalActionMap[name] || {};
-        pageMap[name] = {
-            title: options[name] || name,
-            render: page(PageView, signalActionMap, options)
-        };
+      style : {container : {}, loading : {}, notice : {}}
     }
-
-    let pageEnv = {
-        apiMap,
-        runApi
-    };
-
-    mount(n(`div id="${containerId}"`), document.body); // pager as container
-
-    let {
-        forward,
-        redirect,
-        reload
-    } = router(
-        // pages
-        queryPager(pageMap, defaultPage || Object.keys(pageMap)[0]),
-
-        // page env
-        pageEnv,
-
-        {
-            containerId
-        }
-    );
-
-    pageEnv.forward = forward;
-    pageEnv.redirect = redirect;
-    pageEnv.reload = reload;
-
-    forward(window.location.href);
-};
-
-let page = (PageView, signalActionMap, {
-    localStateStore = false,
-    localStateStoreBlackList = []
-} = {}) => (pageEnv) => {
-    let props = {
-        onsignal: signalActionFlow(signalActionMap, pageEnv)
-    };
-
-    if (localStateStore) {
-        props = wrapPagePropsWithStore(props, {
-            blackList: localStateStoreBlackList
-        });
-    }
-
-    let pageView = n(PageView, props);
-
-    pageView.ctx.notify(Signal(PAGE_RENDER_SIGNAL));
-
-    return pageView;
-};
-
-module.exports = {
-    SPA,
-    page
+  });
 };
 
 
@@ -2814,7 +2633,718 @@ module.exports = {
 "use strict";
 
 
-module.exports = __webpack_require__(38);
+let {
+    view
+} = __webpack_require__(6);
+let steadyTheme = __webpack_require__(107);
+let {
+    deepMergeMap,
+    resolveFnValue
+} = __webpack_require__(1);
+let ClassTable = __webpack_require__(112);
+let {
+    Signal
+} = __webpack_require__(5);
+let JsonTree = __webpack_require__(35);
+let {
+    executeAST
+} = __webpack_require__(15);
+
+/**
+ * define the general interface for lumine view
+ *
+ * 1. unify view data structure
+ *
+ *    view data = {
+ *       // public data
+ *       props,
+ *       children // child views
+ *    }
+ *
+ *    props.onsigal
+ *    props.theme
+ *
+ * 2. onsignal interface
+ *
+ *    onsignal: (signal, data, ctx) -> Any
+ */
+
+module.exports = (viewFun) => ({
+    defaultProps = {},
+    defaultChildren = [],
+    theme = steadyTheme,
+    classTable
+} = {}) => {
+    let defaultStyle = defaultProps.style || {};
+
+    let defaultStyleValue = resolveFnValue(defaultStyle, theme);
+    let classTableValue = resolveFnValue(classTable, theme);
+
+    let {
+        appendStyle,
+        getClassName,
+        updateClassTable
+    } = ClassTable(classTableValue);
+
+    return view((viewData, ctx) => {
+        viewData.props = viewData.props || {};
+        viewData.children = (viewData.children && viewData.children.length) ? viewData.children : defaultChildren;
+        viewData.props.theme = viewData.props.theme || theme;
+
+        appendStyle();
+        // TODO check view Data
+
+        // update defaultStyleValue
+        if (viewData.props.theme && typeof defaultStyle === 'function') {
+            defaultStyleValue = resolveFnValue(defaultStyle, viewData.props.theme);
+        }
+
+        // update class table
+        if (viewData.theme && typeof classTable === 'function') {
+            classTableValue = resolveFnValue(classTable, viewData.props.theme);
+            updateClassTable(classTableValue);
+        }
+
+        // merge props (deep merge)
+        viewData.props.style = deepMergeMap(viewData.props.style, defaultStyleValue);
+        viewData.props = deepMergeMap(viewData.props, defaultProps);
+
+        // signal system
+        let notify = (signal) => {
+            viewData.props.onsignal && viewData.props.onsignal(signal, ctx.getData(), ctx);
+        };
+
+        let viewDataTree = JsonTree(viewData);
+
+        // update with tree script
+        let updateTree = ({
+            ast,
+            variableStub
+        }, variableMap, signal) => {
+            signal = signal || Signal('update-view-data');
+            // update view data by running update script
+            executeAST(ast, {
+                queryByPath: viewDataTree.queryByPath,
+                setByPath: viewDataTree.setByPath,
+                removeByPath: viewDataTree.removeByPath,
+                appendByPath: viewDataTree.appendByPath,
+                variableMap,
+                variableStub
+            });
+            updateWithNotify(signal);
+        };
+
+        let updateWithNotify = (signal, ...updateScript) => {
+            signal = signal || Signal('update-view-data');
+            ctx.update(...updateScript);
+            // notify
+            notify(signal);
+        };
+
+        ctx.notify = notify;
+        ctx.updateWithNotify = updateWithNotify;
+        ctx.updateTree = updateTree;
+        ctx.getClassName = getClassName;
+
+        return viewFun(viewData, ctx);
+    });
+};
+
+
+/***/ }),
+/* 38 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {
+    styles
+} = __webpack_require__(1);
+
+let container = {
+    position: 'relative',
+    boxSizing: 'border-box',
+    margin: 0,
+    padding: 0,
+    border: 0,
+    borderRadius: 0,
+    overflow: 'auto'
+};
+
+let fullParentHeight = {
+    height: '100%'
+};
+
+let fullParentWidth = {
+    width: '100%'
+};
+
+let fullWindow = styles(container, {
+        position: 'fixed',
+        left: 0,
+        top: 0,
+    },
+    fullParentWidth, fullParentHeight);
+
+let fullParent = styles(container, fullParentWidth, fullParentHeight);
+
+let flat = {
+    appearance: 'none',
+    '-webkit-appearance': 'none',
+    '-moz-appearance': 'none',
+    boxShadow: 'none',
+    borderRadius: 'none',
+    border: 0
+};
+
+module.exports = {
+    fullWindow,
+    fullParent,
+    fullParentWidth,
+    fullParentHeight,
+    container,
+    flat
+};
+
+
+/***/ }),
+/* 39 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let lumineView = __webpack_require__(3);
+
+let n = __webpack_require__(2);
+
+let Full = __webpack_require__(21);
+
+let {styles} = __webpack_require__(1);
+
+const {MODE_PERCENTAGE, MODE_PILE, MODE_PARTION} = __webpack_require__(40);
+
+let {
+  getChildStylesInPercentage,
+  getChildStylesInPile,
+  getChildStylesInPartion
+} = __webpack_require__(41);
+
+/**
+ *
+ * layout mode
+ *
+ *  percentage
+ *  left pile
+ *  right pile
+ *
+ *  flex
+ */
+
+module.exports = lumineView(({props, children}) => {
+  let {theme, style, mode, pers, leftPartions, rightPartions} = props;
+  // TODO validate
+  if (mode === MODE_PILE) {
+    style.childs = getChildStylesInPile(children, theme, style.childs, 'width');
+  } else if (mode === MODE_PERCENTAGE) {
+    style.childs = getChildStylesInPercentage(children, pers, style.childs,
+                                              theme, 'width');
+  } else if (mode === MODE_PARTION) {
+    style.childs = getChildStylesInPartion(leftPartions, rightPartions,
+                                           style.childs, theme, 'width');
+  }
+
+  return n(Full, {style : style.container, theme}, [
+    children.map((child, index) =>
+                     n('div', {style : style.childs[index]}, child)),
+
+    (mode === MODE_PERCENTAGE || mode === MODE_PILE) &&
+        n('div style="clear:both"')
+  ]);
+}, {
+  defaultProps : {
+    mode : MODE_PILE,
+    pers : [],         // percentage distribution
+    leftPartions : [], // fixed width or height in top direction
+
+    rightPartions : [], // fixed width or height in bottom direction
+    style : {container : {}, childs : []}
+  }
+});
+
+
+/***/ }),
+/* 40 */
+/***/ (function(module, exports) {
+
+module.exports = {
+  MODE_PILE : 'pile',
+  MODE_PERCENTAGE : 'percentage',
+  MODE_PARTION : 'partion'
+};
+
+
+/***/ }),
+/* 41 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {styles} = __webpack_require__(1);
+
+let getPercentSum = (pers, childLen) => {
+  let sum = 0;
+  for (let i = 0; i < childLen; i++) {
+    let cur = pers[i];
+    cur = cur === undefined ? 1 : cur;
+    sum += cur;
+  }
+
+  return sum;
+};
+
+let getPercent = (sum, pers, index) => {
+  if (sum === 0) {
+    return 0;
+  }
+  return ((pers[index] === undefined ? 1 : pers[index]) / sum) * 100 + '%';
+};
+
+let getChildStylesInPercentage =
+    (children, pers, childStyles, theme, type = 'height') => {
+      let sum = getPercentSum(pers, children.length);
+
+      return children.map((_, index) => {
+        let value = getPercent(sum, pers, index);
+        let valueStyle = {[type] : value};
+        return getChildStyle(type, valueStyle, childStyles[index], theme);
+      });
+    };
+
+let getChildStylesInPile = (children, theme, childStyles, type = 'height') => {
+  return children.map((_, index) =>
+                          getChildStyle(type, {}, childStyles[index], theme));
+};
+
+let getChildStylesInPartion =
+    (frontPartions, backPartions, childStyles, theme, type = 'height') => {
+      // front childs
+      let topStyles = frontPartions.map((v, index) => {
+        return getChildStyle(type, {[type] : v, zIndex : 1}, childStyles[index],
+                             theme);
+      });
+
+      // back childs
+      let bottomStyles = backPartions.map((v, index) => {
+        return getChildStyle(type, {[type] : v, zIndex : 2},
+                             childStyles[topStyles.length + 1 + index], theme);
+      });
+
+      let prev = frontPartions.reduce((sum, v) => sum + v, 0);
+      let next = backPartions.reduce((sum, v) => sum + v, 0);
+
+      // flex one
+      let flexStyle =
+          getChildStyle(type,
+                        type === 'height' ? {
+                          height : '100%',
+                          marginBottom : -1 * (prev + next), // pull up nexts
+                          paddingBottom : prev + next        // scroll childs
+                        }
+                                          : {
+                                              width : '100%',
+                                              position : 'relative',
+                                              paddingLeft : prev + next,
+                                              marginRight : -1 * (prev + next),
+                                              left : -1 * (prev + next),
+                                              zIndex : 0
+                                            },
+                        childStyles[topStyles.length], theme);
+
+      return topStyles.concat([ flexStyle ]).concat(bottomStyles);
+    };
+
+let getChildStyle = (type, specialStyle, childStyle, theme) => {
+  return styles(theme.container, getFullDirection(type, theme),
+                type === 'width' ? {'float' : 'left'} : {}, specialStyle,
+                childStyle || {});
+};
+
+let getFullDirection = (type, theme) => {
+  return type === 'height' ? theme.fullParentWidth : theme.fullParentHeight;
+};
+
+module.exports = {
+  getChildStylesInPercentage,
+  getChildStylesInPile,
+  getChildStylesInPartion
+};
+
+
+/***/ }),
+/* 42 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let lumineView = __webpack_require__(3);
+
+let n = __webpack_require__(2);
+
+let Full = __webpack_require__(21);
+
+const {
+    MODE_PILE,
+    MODE_PERCENTAGE,
+    MODE_PARTION
+} = __webpack_require__(40);
+
+let {
+    getChildStylesInPercentage,
+    getChildStylesInPile,
+    getChildStylesInPartion
+} = __webpack_require__(41);
+
+module.exports = lumineView(({
+    props,
+    children
+}) => {
+    let {
+        theme,
+        style,
+        mode,
+        pers,
+        topPartions,
+        bottomPartions
+    } = props;
+
+    // child container style
+    if (mode === MODE_PERCENTAGE) {
+        style.childs = getChildStylesInPercentage(children, pers, style.childs,
+            theme, 'height');
+    } else if (mode === MODE_PILE) {
+        style.childs =
+            getChildStylesInPile(children, theme, style.childs, 'height');
+    } else if (mode === MODE_PARTION) {
+        style.childs = getChildStylesInPartion(topPartions, bottomPartions,
+            style.childs, theme, 'height');
+    }
+
+    return n(
+        Full, {
+            style: style.container,
+            theme
+        }, [children.map((child, i) => n('div', {
+            style: style.childs[i] || {}
+        }, [child]))]);
+}, {
+    defaultProps: {
+        mode: MODE_PILE,
+        pers: [], // percentage distribution
+
+        topPartions: [], // fixed width or height in top direction
+        bottomPartions: [], // fixed width or height in bottom direction
+
+        style: {
+            container: {},
+            childs: {}
+        }
+    }
+});
+
+
+/***/ }),
+/* 43 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let lumineView = __webpack_require__(3);
+let {
+    styles
+} = __webpack_require__(1);
+
+let Button = __webpack_require__(120);
+let {
+    Signal,
+    onSignalType
+} = __webpack_require__(5);
+let n = __webpack_require__(2);
+
+module.exports = lumineView(({
+    props
+}, {
+    notify
+}) => {
+    let onLogoSignal = (sourceType, index) => {
+        if (index !== undefined) {
+            notify(Signal('click', {
+                sourceType,
+                index
+            }));
+        }
+    };
+
+    let logoRight = (logoRightNode, index) => {
+        return n(Button, {
+            theme: props.theme,
+            style: props.style.logoRight,
+            onsignal: onSignalType('click', () => onLogoSignal('rightLogo', index))
+        }, [logoRightNode]);
+    };
+
+    let logoLeft = (logoLeftNode, index) => {
+        return n(Button, {
+            theme: props.theme,
+            style: props.style.logoLeft,
+            onsignal: onSignalType('click', () => onLogoSignal('leftLogos', index))
+        }, [logoLeftNode]);
+    };
+
+    return n('div', {
+        style: props.style.container
+    }, [
+        n('div', {
+            style: props.style.title
+        }, props.title),
+
+        props.leftLogos.map(logoLeft),
+
+        props.rightLogos.reduce((prev, logo, index) => {
+            prev.unshift(logoRight(logo, index));
+            return prev;
+        }, []),
+
+        n('div style="clear:both"')
+    ]);
+}, {
+    defaultProps: {
+        title: '',
+        leftLogos: [],
+        rightLogos: [],
+        signal: {
+            type: 0,
+            sourceType: null,
+            index: null
+        },
+
+        style: (theme) => {
+            return {
+                title: {
+                    textAlign: 'center',
+                    color: 'white',
+                    fontSize: theme.basics.titleSize,
+                    lineHeight: 40,
+                    position: 'absolute',
+                    width: '100%'
+                },
+                container: styles(theme.oneLineBulk, theme.actions.cling, {
+                    height: 40,
+                    width: '100%',
+                    overflow: 'hidden'
+                }),
+                logoLeft: {
+                    'float': 'left',
+                    height: 40,
+                    cursor: 'pointer'
+                },
+                logoRight: {
+                    'float': 'right',
+                    height: 40,
+                    cursor: 'pointer'
+                }
+            };
+        }
+    }
+});
+
+
+/***/ }),
+/* 44 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let n = __webpack_require__(2);
+let lumineView = __webpack_require__(3);
+let {
+    styles
+} = __webpack_require__(1);
+let {
+    Signal
+} = __webpack_require__(5);
+
+module.exports = lumineView(({
+    props,
+    children
+}, {
+    notify
+}) => {
+    return n('div', {
+        style: styles(props.style.container),
+        onclick: () => {
+            notify(Signal('click'));
+        }
+    }, [
+        n('div', {
+            style: styles({
+                padding: props.theme.basics.narrowPadding
+            }, props.style.content)
+        }, [
+            props.title && n('h3', {
+                style: props.style.title
+            }, [props.title]),
+            children
+        ])
+    ]);
+}, {
+    defaultProps: {
+        title: '',
+        style: (theme) => {
+            return {
+                container: styles(theme.cardBox),
+                content: {},
+                title: {}
+            };
+        }
+    },
+
+    defaultChildren: ['']
+});
+
+
+/***/ }),
+/* 45 */
+/***/ (function(module, exports) {
+
+module.exports = [{
+    name: 'flexible UI test restraints design',
+    date: '2017-09-27',
+    brief: 'UI changes day by day, how to define the correct state of UI become a problem. If the restraints we designed are too strong, they will be useless, because we have to change them everyday. If the restraints we designed are too week, they won\'t be able to guard the UI.',
+    docId: 'flexible_UI_test_restraints_design'
+}];
+
+
+/***/ }),
+/* 46 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {SPA} = __webpack_require__(47);
+let pageSignalActionMap = __webpack_require__(104);
+let pageViewMap = __webpack_require__(105);
+
+SPA({
+  pageViewMap,
+  pageSignalActionMap,
+  pageOptionsMap : {},
+  defaultPage : 'indexPage'
+});
+
+
+/***/ }),
+/* 47 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {router, queryPager} = __webpack_require__(48);
+let {mount} = __webpack_require__(6);
+let n = __webpack_require__(2);
+let pfcApis = __webpack_require__(70);
+let {signalActionFlow} = __webpack_require__(74);
+let {Signal} = __webpack_require__(5);
+let {wrapPagePropsWithStore} = __webpack_require__(103);
+
+const PAGE_RENDER_SIGNAL = 'kabanery_page_render';
+
+let SPA = ({
+  apiPath = '/api/pfc',
+  apiStub = {},
+  containerId = 'pager',
+
+  // page configs
+  pageViewMap = {},
+  pageSignalActionMap = {},
+  pageOptionsMap = {},
+
+  defaultPage
+}) => {
+  // TODO validate params
+  let {apiMap, runApi} = pfcApis(apiPath, apiStub);
+
+  // create page map
+  let pageMap = {};
+
+  for (let name in pageViewMap) {
+    let options = pageOptionsMap[name] || {};
+    let PageView = pageViewMap[name];
+    let signalActionMap = pageSignalActionMap[name] || {};
+    pageMap[name] = {
+      title : options[name] || name,
+      render : page(PageView, signalActionMap, options)
+    };
+  }
+
+  let pageEnv = {apiMap, runApi};
+
+  mount(n(`div id="${containerId}"`), document.body); // pager as container
+
+  let {forward, redirect, reload} = router(
+      // pages
+      queryPager(pageMap, defaultPage || Object.keys(pageMap)[0]),
+
+      // page env
+      pageEnv,
+
+      {containerId});
+
+  pageEnv.forward = forward;
+  pageEnv.redirect = redirect;
+  pageEnv.reload = reload;
+
+  forward(window.location.href);
+};
+
+let page = (PageView, signalActionMap,
+            {localStateStore = false, localStateStoreWhiteList = []} = {}) =>
+    (pageEnv) => {
+      let props = {onsignal : signalActionFlow(signalActionMap, pageEnv)};
+
+      if (localStateStore) {
+        props = wrapPagePropsWithStore(props,
+                                       {whiteList : localStateStoreWhiteList});
+      }
+
+      let pageView = n(PageView, props);
+
+      pageView.ctx.notify(Signal(PAGE_RENDER_SIGNAL));
+
+      return pageView;
+    };
+
+module.exports = {
+  SPA,
+  page
+};
+
+
+/***/ }),
+/* 48 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+module.exports = __webpack_require__(49);
 
 /**
  * @readme-quick-run
@@ -2851,7 +3381,7 @@ module.exports = __webpack_require__(38);
 
 
 /***/ }),
-/* 38 */
+/* 49 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -2859,13 +3389,13 @@ module.exports = __webpack_require__(38);
 
 let {
     removeChilds
-} = __webpack_require__(18);
+} = __webpack_require__(22);
 
 let {
     mount
 } = __webpack_require__(6);
 
-let querystring = __webpack_require__(23);
+let querystring = __webpack_require__(14);
 
 const SINGLE_JUMP_PREFIX = 'single://';
 
@@ -3047,7 +3577,7 @@ module.exports = {
 
 
 /***/ }),
-/* 39 */
+/* 50 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3102,7 +3632,7 @@ module.exports = shadowFrame;
 
 
 /***/ }),
-/* 40 */
+/* 51 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3158,7 +3688,7 @@ module.exports = startMomenter;
 
 
 /***/ }),
-/* 41 */
+/* 52 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3175,13 +3705,13 @@ let {
     parseStyle
 } = __webpack_require__(10);
 
-let plugs = __webpack_require__(45);
+let plugs = __webpack_require__(56);
 
-let view = __webpack_require__(48);
+let view = __webpack_require__(59);
 
-let mount = __webpack_require__(22);
+let mount = __webpack_require__(26);
 
-let N = __webpack_require__(56);
+let N = __webpack_require__(67);
 
 let reduceNode = __webpack_require__(12);
 
@@ -3211,13 +3741,13 @@ module.exports = {
 
 
 /***/ }),
-/* 42 */
+/* 53 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let iterate = __webpack_require__(19);
+let iterate = __webpack_require__(23);
 
 let defauls = {
     eq: (v1, v2) => v1 === v2
@@ -3316,13 +3846,13 @@ module.exports = {
 
 
 /***/ }),
-/* 43 */
+/* 54 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let parseAttribute = __webpack_require__(44);
+let parseAttribute = __webpack_require__(55);
 
 let {
     isString,
@@ -3413,7 +3943,7 @@ module.exports = parseArgs;
 
 
 /***/ }),
-/* 44 */
+/* 55 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3423,11 +3953,11 @@ let {
     isString
 } = __webpack_require__(0);
 
-let parseStyle = __webpack_require__(20);
+let parseStyle = __webpack_require__(24);
 
 let {
     mergeMap
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
 const ITEM_REG = /([\w-]+)\s*=\s*(([\w-]+)|('.*?')|(".*?"))/;
 
@@ -3487,14 +4017,14 @@ module.exports = parseAttribute;
 
 
 /***/ }),
-/* 45 */
+/* 56 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let twowaybinding = __webpack_require__(46);
-let eventError = __webpack_require__(47);
+let twowaybinding = __webpack_require__(57);
+let eventError = __webpack_require__(58);
 
 module.exports = {
     twowaybinding,
@@ -3503,7 +4033,7 @@ module.exports = {
 
 
 /***/ }),
-/* 46 */
+/* 57 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3530,7 +4060,7 @@ module.exports = (obj, path) => (tagName, attributes, childExp) => {
 
 
 /***/ }),
-/* 47 */
+/* 58 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3562,7 +4092,7 @@ let wrapEventHandler = (fun, catcher) => {
 
 
 /***/ }),
-/* 48 */
+/* 59 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3580,13 +4110,13 @@ let {
 
 let {
     forEach
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
-let replace = __webpack_require__(49);
+let replace = __webpack_require__(60);
 
 let reduceNode = __webpack_require__(12);
 
-let mount = __webpack_require__(22);
+let mount = __webpack_require__(26);
 
 /**
  * render function: (data) => node
@@ -3781,7 +4311,7 @@ module.exports = View;
 
 
 /***/ }),
-/* 49 */
+/* 60 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -3797,13 +4327,13 @@ let {
 
 let {
     forEach
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
 let {
     eventMapHook
 } = __webpack_require__(11);
 
-let applyAttibutes = __webpack_require__(53);
+let applyAttibutes = __webpack_require__(64);
 
 let replaceDirectly = (node, newNode) => {
     let parent = node.parentNode;
@@ -3917,7 +4447,7 @@ module.exports = (node, newNode) => {
 
 
 /***/ }),
-/* 50 */
+/* 61 */
 /***/ (function(module, exports, __webpack_require__) {
 
 /* WEBPACK VAR INJECTION */(function(global) {// Unique ID creation requires a high quality random # generator.  In the
@@ -3954,10 +4484,10 @@ if (!rng) {
 
 module.exports = rng;
 
-/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(51)))
+/* WEBPACK VAR INJECTION */}.call(exports, __webpack_require__(62)))
 
 /***/ }),
-/* 51 */
+/* 62 */
 /***/ (function(module, exports) {
 
 var g;
@@ -3984,7 +4514,7 @@ module.exports = g;
 
 
 /***/ }),
-/* 52 */
+/* 63 */
 /***/ (function(module, exports) {
 
 /**
@@ -4013,7 +4543,7 @@ module.exports = bytesToUuid;
 
 
 /***/ }),
-/* 53 */
+/* 64 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4021,7 +4551,7 @@ module.exports = bytesToUuid;
 
 let {
     getAttributeMap
-} = __webpack_require__(18);
+} = __webpack_require__(22);
 
 let {
     hasOwnProperty
@@ -4029,7 +4559,7 @@ let {
 
 let {
     forEach
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
 let applyAttibutes = (node, newNode) => {
     // attributes
@@ -4060,7 +4590,7 @@ module.exports = applyAttibutes;
 
 
 /***/ }),
-/* 54 */
+/* 65 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4107,7 +4637,7 @@ module.exports = {
 
 
 /***/ }),
-/* 55 */
+/* 66 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4115,7 +4645,7 @@ module.exports = {
 
 let {
     contain
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
 let {
     eventMapHook,
@@ -4263,7 +4793,7 @@ let getGlobalEventTypeId = (type) => `${globalEventTypePrefix}${type}`;
 
 
 /***/ }),
-/* 56 */
+/* 67 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4279,7 +4809,7 @@ let {
 
 let {
     map
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
 module.exports = (...args) => {
     let tagName = args[0],
@@ -4319,7 +4849,7 @@ module.exports = (...args) => {
 
 
 /***/ }),
-/* 57 */
+/* 68 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4410,7 +4940,7 @@ var isArray = Array.isArray || function (xs) {
 
 
 /***/ }),
-/* 58 */
+/* 69 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4502,14 +5032,14 @@ var objectKeys = Object.keys || function (obj) {
 
 
 /***/ }),
-/* 59 */
+/* 70 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let stubAsApis = __webpack_require__(60);
-let pfcRequestor = __webpack_require__(62);
+let stubAsApis = __webpack_require__(71);
+let pfcRequestor = __webpack_require__(73);
 
 module.exports = (apiPath, stub) => {
     let pfcRequest = pfcRequestor(apiPath);
@@ -4568,7 +5098,7 @@ let isLazyFun = (f) => {
 
 
 /***/ }),
-/* 60 */
+/* 71 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4577,7 +5107,7 @@ let isLazyFun = (f) => {
 let {
     isObject,
     isFunction
-} = __webpack_require__(61);
+} = __webpack_require__(72);
 
 /**
  * we got stub and use it as apis to ccontruct pfc code
@@ -4663,7 +5193,7 @@ let serializeAtom = (atom) => {
 
 
 /***/ }),
-/* 61 */
+/* 72 */
 /***/ (function(module, exports) {
 
 // ignore whitespace
@@ -4704,7 +5234,7 @@ module.exports = {
 
 
 /***/ }),
-/* 62 */
+/* 73 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4742,7 +5272,7 @@ module.exports = requestor;
 
 
 /***/ }),
-/* 63 */
+/* 74 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4753,7 +5283,7 @@ let {
     signalSendRequestRunner,
     responseUpdateStateRunner,
     responseErrorRunner
-} = __webpack_require__(64);
+} = __webpack_require__(75);
 
 /**
  * action flow
@@ -4892,7 +5422,7 @@ module.exports = {
 
 
 /***/ }),
-/* 64 */
+/* 75 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -4902,8 +5432,8 @@ let {
     parseStrToAst,
     checkAST,
     executeAST
-} = __webpack_require__(14);
-let JsonTree = __webpack_require__(32);
+} = __webpack_require__(15);
+let JsonTree = __webpack_require__(35);
 
 /**
  *
@@ -5019,18 +5549,18 @@ module.exports = {
 
 
 /***/ }),
-/* 65 */
+/* 76 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let parser = __webpack_require__(66);
+let parser = __webpack_require__(77);
 let {
     checkAST,
     runTimeCheck,
     getVariable
-} = __webpack_require__(90);
+} = __webpack_require__(101);
 
 let {
     T_ATOM,
@@ -5042,7 +5572,7 @@ let {
     T_FUNCTION,
     T_NODE_NAME,
     T_NODE_NAME_VARIABLE
-} = __webpack_require__(17);
+} = __webpack_require__(18);
 
 let executeAST = (ast, {
     queryByPath,
@@ -5188,25 +5718,25 @@ module.exports = {
 
 
 /***/ }),
-/* 66 */
+/* 77 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let streamTokenSpliter = __webpack_require__(24);
+let streamTokenSpliter = __webpack_require__(27);
 let {
     LR
-} = __webpack_require__(76);
+} = __webpack_require__(87);
 let {
     getProductionId,
     processTokens,
-} = __webpack_require__(31);
-let tokenTypes = __webpack_require__(87);
+} = __webpack_require__(34);
+let tokenTypes = __webpack_require__(98);
 let {
     ACTION,
     GOTO
-} = __webpack_require__(89);
+} = __webpack_require__(100);
 
 let {
     P_PROGRAM,
@@ -5251,7 +5781,7 @@ let {
     T_FUNCTION,
     T_NODE_NAME,
     T_NODE_NAME_VARIABLE
-} = __webpack_require__(17);
+} = __webpack_require__(18);
 
 module.exports = () => {
     let tokenSpliter = streamTokenSpliter.parser(tokenTypes);
@@ -5458,7 +5988,7 @@ module.exports = () => {
 
 
 /***/ }),
-/* 67 */
+/* 78 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5470,30 +6000,30 @@ let {
 
 let {
     WAIT, MATCH, QUIT
-} = __webpack_require__(15);
+} = __webpack_require__(16);
 
 let {
     stateGraphDSL
 } = __webpack_require__(9);
 
-let buildFSM = __webpack_require__(73);
+let buildFSM = __webpack_require__(84);
 
 let {
     map
-} = __webpack_require__(1);
+} = __webpack_require__(4);
 
 let {
     getMatch
-} = __webpack_require__(74);
+} = __webpack_require__(85);
 
 let {
     findToken,
     filterTypes
-} = __webpack_require__(75);
+} = __webpack_require__(86);
 
 let {
     assembleToken
-} = __webpack_require__(28);
+} = __webpack_require__(31);
 
 /**
  *
@@ -5727,7 +6257,7 @@ module.exports = {
 
 
 /***/ }),
-/* 68 */
+/* 79 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5735,9 +6265,9 @@ module.exports = {
 
 let {
     QUIT, WAIT, MATCH
-} = __webpack_require__(69);
+} = __webpack_require__(80);
 
-let stateGraphDSL = __webpack_require__(70);
+let stateGraphDSL = __webpack_require__(81);
 
 const START_STATE = '__start__state__';
 
@@ -5810,7 +6340,7 @@ module.exports = {
 
 
 /***/ }),
-/* 69 */
+/* 80 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -5824,13 +6354,13 @@ module.exports = {
 
 
 /***/ }),
-/* 70 */
+/* 81 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let actionDSL = __webpack_require__(25);
+let actionDSL = __webpack_require__(28);
 
 let {
     isNormalAction, isRangeAction, isUnionAction, isLeftAction, isEpsilonAction
@@ -5846,11 +6376,11 @@ let {
     circle,
 
     isEpsilonTransition
-} = __webpack_require__(71);
+} = __webpack_require__(82);
 
 let {
     mergeMap
-} = __webpack_require__(26);
+} = __webpack_require__(29);
 
 let transitionMaper = (graph) => {
     let transitions = {};
@@ -6056,7 +6586,7 @@ module.exports = mergeMap(actionDSL, {
 
 
 /***/ }),
-/* 71 */
+/* 82 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6066,7 +6596,7 @@ let {
     isString, isObject
 } = __webpack_require__(0);
 
-let actionDSL = __webpack_require__(25);
+let actionDSL = __webpack_require__(28);
 
 let {
     toAction
@@ -6074,7 +6604,7 @@ let {
 
 let {
     mergeMap
-} = __webpack_require__(26);
+} = __webpack_require__(29);
 
 /**
  * graph definition DSL
@@ -6214,7 +6744,7 @@ module.exports = mergeMap(actionDSL, {
 
 
 /***/ }),
-/* 72 */
+/* 83 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6222,7 +6752,7 @@ module.exports = mergeMap(actionDSL, {
 
 let {
     iterate
-} = __webpack_require__(27);
+} = __webpack_require__(30);
 
 let {
     isFunction
@@ -6339,7 +6869,7 @@ module.exports = {
 
 
 /***/ }),
-/* 73 */
+/* 84 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6379,7 +6909,7 @@ module.exports = (stateMap, accepts) => {
 
 
 /***/ }),
-/* 74 */
+/* 85 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6391,7 +6921,7 @@ let {
 
 let {
     MATCH, WAIT, QUIT
-} = __webpack_require__(15);
+} = __webpack_require__(16);
 
 let stringMatch = (word) => (prefix) => {
     if (word === prefix) return MATCH;
@@ -6411,7 +6941,7 @@ module.exports = {
 
 
 /***/ }),
-/* 75 */
+/* 86 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6419,11 +6949,11 @@ module.exports = {
 
 let {
     WAIT, MATCH
-} = __webpack_require__(15);
+} = __webpack_require__(16);
 
 let {
     assembleToken
-} = __webpack_require__(28);
+} = __webpack_require__(31);
 
 let filterTypes = (nextLetter, prefix, tokenTypes) => {
     let parts = [],
@@ -6479,7 +7009,7 @@ module.exports = {
 
 
 /***/ }),
-/* 76 */
+/* 87 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6528,11 +7058,11 @@ module.exports = {
  * let ast = lrParse(null); // null as end symbol
  * console.log(JSON.stringify(ast, null, 4));
  */
-module.exports = __webpack_require__(77);
+module.exports = __webpack_require__(88);
 
 
 /***/ }),
-/* 77 */
+/* 88 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6552,12 +7082,12 @@ module.exports = __webpack_require__(77);
  * 2. shift-in reduce
  */
 
-let LR = __webpack_require__(78);
-let LR1Table = __webpack_require__(81);
-let ctxFreeGrammer = __webpack_require__(86);
+let LR = __webpack_require__(89);
+let LR1Table = __webpack_require__(92);
+let ctxFreeGrammer = __webpack_require__(97);
 let {
     forEach
-} = __webpack_require__(4);
+} = __webpack_require__(7);
 
 /**
  * just used for testing
@@ -6585,7 +7115,7 @@ module.exports = {
 
 
 /***/ }),
-/* 78 */
+/* 89 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6612,13 +7142,13 @@ module.exports = {
 
 let {
     END_SYMBOL, EXPAND_START_SYMBOL
-} = __webpack_require__(29);
+} = __webpack_require__(32);
 
 let {
     initAST,
     reduceAST,
     appendToken
-} = __webpack_require__(79);
+} = __webpack_require__(90);
 
 /**
  * configuration = [stack, tokens]
@@ -6773,7 +7303,7 @@ let getNextInputToken = (configuration) => {
 
 
 /***/ }),
-/* 79 */
+/* 90 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6823,7 +7353,7 @@ let getNextInputToken = (configuration) => {
 
 let {
     map
-} = __webpack_require__(4);
+} = __webpack_require__(7);
 
 const TERMINAL_TYPE = 'terminal';
 const NONE_TERMINAL_TYPE = 'none-terminal';
@@ -6902,7 +7432,7 @@ module.exports = {
 
 
 /***/ }),
-/* 80 */
+/* 91 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -6910,7 +7440,7 @@ module.exports = {
 
 let {
     iterate
-} = __webpack_require__(30);
+} = __webpack_require__(33);
 
 let {
     isFunction
@@ -7027,23 +7557,23 @@ module.exports = {
 
 
 /***/ }),
-/* 81 */
+/* 92 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let LR1CanonicalCollection = __webpack_require__(82);
+let LR1CanonicalCollection = __webpack_require__(93);
 let {
     forEach, findIndex
-} = __webpack_require__(4);
-let GO = __webpack_require__(83);
+} = __webpack_require__(7);
+let GO = __webpack_require__(94);
 let {
     LR1Itemer
-} = __webpack_require__(84);
+} = __webpack_require__(95);
 let {
     sameClosure
-} = __webpack_require__(16);
+} = __webpack_require__(17);
 
 module.exports = (grammer) => {
     let {
@@ -7112,7 +7642,7 @@ let getStateIndex = (C, I) => findIndex(C, I, {
 
 
 /***/ }),
-/* 82 */
+/* 93 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7120,10 +7650,10 @@ let getStateIndex = (C, I) => findIndex(C, I, {
 
 let {
     buildClosure
-} = __webpack_require__(16);
+} = __webpack_require__(17);
 let {
     reduce
-} = __webpack_require__(4);
+} = __webpack_require__(7);
 
 /**
  * input: grammer G
@@ -7193,7 +7723,7 @@ let getGoToSymbolsSet = (symbols, I, go) => {
 
 
 /***/ }),
-/* 83 */
+/* 94 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7201,11 +7731,11 @@ let getGoToSymbolsSet = (symbols, I, go) => {
 
 let {
     reduce, filter
-} = __webpack_require__(4);
+} = __webpack_require__(7);
 
 let {
     buildClosure
-} = __webpack_require__(16);
+} = __webpack_require__(17);
 
 /**
  * jump
@@ -7268,17 +7798,17 @@ module.exports = (grammer, LR1Grammer) => {
 
 
 /***/ }),
-/* 84 */
+/* 95 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let First = __webpack_require__(85);
+let First = __webpack_require__(96);
 
 let {
     union, reduce, filter, flat, map
-} = __webpack_require__(4);
+} = __webpack_require__(7);
 
 let LR1Itemer = (grammer) => {
     let {
@@ -7465,7 +7995,7 @@ module.exports = {
 
 
 /***/ }),
-/* 85 */
+/* 96 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7473,7 +8003,7 @@ module.exports = {
 
 let {
     contain, union, reduce, difference, forEach
-} = __webpack_require__(4);
+} = __webpack_require__(7);
 
 let {
     isArray
@@ -7578,7 +8108,7 @@ module.exports = (grammer) => {
 
 
 /***/ }),
-/* 86 */
+/* 97 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7599,7 +8129,7 @@ module.exports = (grammer) => {
 
 const {
     END_SYMBOL, EXPAND_START_SYMBOL, EPSILON
-} = __webpack_require__(29);
+} = __webpack_require__(32);
 
 /**
  * context free grammer is read-only
@@ -7685,7 +8215,7 @@ let getNoneTerminalProductionMap = (producitons) => {
 
 
 /***/ }),
-/* 87 */
+/* 98 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7694,11 +8224,11 @@ let getNoneTerminalProductionMap = (producitons) => {
 let {
     stringGraph,
     numberGraph
-} = __webpack_require__(88);
+} = __webpack_require__(99);
 
 let {
     buildFSM
-} = __webpack_require__(24);
+} = __webpack_require__(27);
 
 let FSM = __webpack_require__(9);
 let {
@@ -7829,7 +8359,7 @@ module.exports = [
 
 
 /***/ }),
-/* 88 */
+/* 99 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7887,13 +8417,13 @@ module.exports = {
 
 
 /***/ }),
-/* 89 */
+/* 100 */
 /***/ (function(module, exports) {
 
 module.exports={"GOTO":[{"PROGRAM":11,"EXPRESSION_LIST":12,"EXPRESSION":13,"UPDATE_EXPRESSION":14,"QUERY_EXPRESSION":15,"PATH":16,"ATOM_DATA":17},{"PATH":20},{"PATH":23},{},{"PATH":25},{"PATH":26},{},{},{},{},{},{},{},{},{},{},{},{},{"PATH":29},{"PATH":30},{},{"PATH":31},{"PATH":32},{},{"QUERY_EXPRESSION":43,"QUERY_EXPRESSION_LIST":44,"PATH":45,"ATOM_DATA":46},{},{},{"EXPRESSION_LIST":47,"EXPRESSION":13,"UPDATE_EXPRESSION":14,"QUERY_EXPRESSION":15,"PATH":16,"ATOM_DATA":17},{"QUERY_EXPRESSION":48,"PATH":49,"ATOM_DATA":17},{},{},{},{},{"QUERY_EXPRESSION":50,"PATH":49,"ATOM_DATA":17},{},{},{"PATH":52},{"PATH":53},{},{},{},{},{},{},{},{},{},{},{},{},{},{"QUERY_EXPRESSION":43,"QUERY_EXPRESSION_LIST":57,"PATH":45,"ATOM_DATA":46},{},{},{"QUERY_EXPRESSION":43,"QUERY_EXPRESSION_LIST":58,"PATH":45,"ATOM_DATA":46},{},{},{},{},{}],"ACTION":[{"$":{"type":"reduce","production":["EXPRESSION",[]]},"semicolon":{"type":"reduce","production":["EXPRESSION",[]]},"variableName":{"type":"shift","state":3},"delete":{"type":"shift","state":1},"append":{"type":"shift","state":2},"true":{"type":"shift","state":6},"false":{"type":"shift","state":7},"null":{"type":"shift","state":8},"string":{"type":"shift","state":9},"number":{"type":"shift","state":10},"nodeName":{"type":"shift","state":4},"nodeNameVariable":{"type":"shift","state":5}},{"nodeName":{"type":"shift","state":18},"nodeNameVariable":{"type":"shift","state":19}},{"nodeName":{"type":"shift","state":21},"nodeNameVariable":{"type":"shift","state":22}},{"$":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName"]]},"semicolon":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName"]]},"leftBracket":{"type":"shift","state":24}},{"$":{"type":"reduce","production":["PATH",["nodeName"]]},"assign":{"type":"reduce","production":["PATH",["nodeName"]]},"semicolon":{"type":"reduce","production":["PATH",["nodeName"]]},"nodeName":{"type":"shift","state":4},"nodeNameVariable":{"type":"shift","state":5}},{"$":{"type":"reduce","production":["PATH",["nodeNameVariable"]]},"assign":{"type":"reduce","production":["PATH",["nodeNameVariable"]]},"semicolon":{"type":"reduce","production":["PATH",["nodeNameVariable"]]},"nodeName":{"type":"shift","state":4},"nodeNameVariable":{"type":"shift","state":5}},{"$":{"type":"reduce","production":["ATOM_DATA",["true"]]},"semicolon":{"type":"reduce","production":["ATOM_DATA",["true"]]}},{"$":{"type":"reduce","production":["ATOM_DATA",["false"]]},"semicolon":{"type":"reduce","production":["ATOM_DATA",["false"]]}},{"$":{"type":"reduce","production":["ATOM_DATA",["null"]]},"semicolon":{"type":"reduce","production":["ATOM_DATA",["null"]]}},{"$":{"type":"reduce","production":["ATOM_DATA",["string"]]},"semicolon":{"type":"reduce","production":["ATOM_DATA",["string"]]}},{"$":{"type":"reduce","production":["ATOM_DATA",["number"]]},"semicolon":{"type":"reduce","production":["ATOM_DATA",["number"]]}},{"$":{"type":"accept"}},{"$":{"type":"reduce","production":["PROGRAM",["EXPRESSION_LIST"]]}},{"$":{"type":"reduce","production":["EXPRESSION_LIST",["EXPRESSION"]]},"semicolon":{"type":"shift","state":27}},{"$":{"type":"reduce","production":["EXPRESSION",["UPDATE_EXPRESSION"]]},"semicolon":{"type":"reduce","production":["EXPRESSION",["UPDATE_EXPRESSION"]]}},{"$":{"type":"reduce","production":["EXPRESSION",["QUERY_EXPRESSION"]]},"semicolon":{"type":"reduce","production":["EXPRESSION",["QUERY_EXPRESSION"]]}},{"$":{"type":"reduce","production":["QUERY_EXPRESSION",["PATH"]]},"semicolon":{"type":"reduce","production":["QUERY_EXPRESSION",["PATH"]]},"assign":{"type":"shift","state":28}},{"$":{"type":"reduce","production":["QUERY_EXPRESSION",["ATOM_DATA"]]},"semicolon":{"type":"reduce","production":["QUERY_EXPRESSION",["ATOM_DATA"]]}},{"$":{"type":"reduce","production":["PATH",["nodeName"]]},"semicolon":{"type":"reduce","production":["PATH",["nodeName"]]},"nodeName":{"type":"shift","state":18},"nodeNameVariable":{"type":"shift","state":19}},{"$":{"type":"reduce","production":["PATH",["nodeNameVariable"]]},"semicolon":{"type":"reduce","production":["PATH",["nodeNameVariable"]]},"nodeName":{"type":"shift","state":18},"nodeNameVariable":{"type":"shift","state":19}},{"$":{"type":"reduce","production":["UPDATE_EXPRESSION",["delete","PATH"]]},"semicolon":{"type":"reduce","production":["UPDATE_EXPRESSION",["delete","PATH"]]}},{"assign":{"type":"reduce","production":["PATH",["nodeName"]]},"nodeName":{"type":"shift","state":21},"nodeNameVariable":{"type":"shift","state":22}},{"assign":{"type":"reduce","production":["PATH",["nodeNameVariable"]]},"nodeName":{"type":"shift","state":21},"nodeNameVariable":{"type":"shift","state":22}},{"assign":{"type":"shift","state":33}},{"rightBracket":{"type":"shift","state":35},"variableName":{"type":"shift","state":34},"true":{"type":"shift","state":38},"false":{"type":"shift","state":39},"null":{"type":"shift","state":40},"string":{"type":"shift","state":41},"number":{"type":"shift","state":42},"nodeName":{"type":"shift","state":36},"nodeNameVariable":{"type":"shift","state":37}},{"$":{"type":"reduce","production":["PATH",["nodeName","PATH"]]},"assign":{"type":"reduce","production":["PATH",["nodeName","PATH"]]},"semicolon":{"type":"reduce","production":["PATH",["nodeName","PATH"]]}},{"$":{"type":"reduce","production":["PATH",["nodeNameVariable","PATH"]]},"assign":{"type":"reduce","production":["PATH",["nodeNameVariable","PATH"]]},"semicolon":{"type":"reduce","production":["PATH",["nodeNameVariable","PATH"]]}},{"$":{"type":"reduce","production":["EXPRESSION",[]]},"semicolon":{"type":"reduce","production":["EXPRESSION",[]]},"variableName":{"type":"shift","state":3},"delete":{"type":"shift","state":1},"append":{"type":"shift","state":2},"true":{"type":"shift","state":6},"false":{"type":"shift","state":7},"null":{"type":"shift","state":8},"string":{"type":"shift","state":9},"number":{"type":"shift","state":10},"nodeName":{"type":"shift","state":4},"nodeNameVariable":{"type":"shift","state":5}},{"variableName":{"type":"shift","state":3},"true":{"type":"shift","state":6},"false":{"type":"shift","state":7},"null":{"type":"shift","state":8},"string":{"type":"shift","state":9},"number":{"type":"shift","state":10},"nodeName":{"type":"shift","state":18},"nodeNameVariable":{"type":"shift","state":19}},{"$":{"type":"reduce","production":["PATH",["nodeName","PATH"]]},"semicolon":{"type":"reduce","production":["PATH",["nodeName","PATH"]]}},{"$":{"type":"reduce","production":["PATH",["nodeNameVariable","PATH"]]},"semicolon":{"type":"reduce","production":["PATH",["nodeNameVariable","PATH"]]}},{"assign":{"type":"reduce","production":["PATH",["nodeName","PATH"]]}},{"assign":{"type":"reduce","production":["PATH",["nodeNameVariable","PATH"]]}},{"variableName":{"type":"shift","state":3},"true":{"type":"shift","state":6},"false":{"type":"shift","state":7},"null":{"type":"shift","state":8},"string":{"type":"shift","state":9},"number":{"type":"shift","state":10},"nodeName":{"type":"shift","state":18},"nodeNameVariable":{"type":"shift","state":19}},{"comma":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName"]]},"rightBracket":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName"]]},"leftBracket":{"type":"shift","state":51}},{"$":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName","leftBracket","rightBracket"]]},"semicolon":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName","leftBracket","rightBracket"]]}},{"comma":{"type":"reduce","production":["PATH",["nodeName"]]},"rightBracket":{"type":"reduce","production":["PATH",["nodeName"]]},"nodeName":{"type":"shift","state":36},"nodeNameVariable":{"type":"shift","state":37}},{"comma":{"type":"reduce","production":["PATH",["nodeNameVariable"]]},"rightBracket":{"type":"reduce","production":["PATH",["nodeNameVariable"]]},"nodeName":{"type":"shift","state":36},"nodeNameVariable":{"type":"shift","state":37}},{"comma":{"type":"reduce","production":["ATOM_DATA",["true"]]},"rightBracket":{"type":"reduce","production":["ATOM_DATA",["true"]]}},{"comma":{"type":"reduce","production":["ATOM_DATA",["false"]]},"rightBracket":{"type":"reduce","production":["ATOM_DATA",["false"]]}},{"comma":{"type":"reduce","production":["ATOM_DATA",["null"]]},"rightBracket":{"type":"reduce","production":["ATOM_DATA",["null"]]}},{"comma":{"type":"reduce","production":["ATOM_DATA",["string"]]},"rightBracket":{"type":"reduce","production":["ATOM_DATA",["string"]]}},{"comma":{"type":"reduce","production":["ATOM_DATA",["number"]]},"rightBracket":{"type":"reduce","production":["ATOM_DATA",["number"]]}},{"rightBracket":{"type":"reduce","production":["QUERY_EXPRESSION_LIST",["QUERY_EXPRESSION"]]},"comma":{"type":"shift","state":54}},{"rightBracket":{"type":"shift","state":55}},{"comma":{"type":"reduce","production":["QUERY_EXPRESSION",["PATH"]]},"rightBracket":{"type":"reduce","production":["QUERY_EXPRESSION",["PATH"]]}},{"comma":{"type":"reduce","production":["QUERY_EXPRESSION",["ATOM_DATA"]]},"rightBracket":{"type":"reduce","production":["QUERY_EXPRESSION",["ATOM_DATA"]]}},{"$":{"type":"reduce","production":["EXPRESSION_LIST",["EXPRESSION","semicolon","EXPRESSION_LIST"]]}},{"$":{"type":"reduce","production":["UPDATE_EXPRESSION",["PATH","assign","QUERY_EXPRESSION"]]},"semicolon":{"type":"reduce","production":["UPDATE_EXPRESSION",["PATH","assign","QUERY_EXPRESSION"]]}},{"$":{"type":"reduce","production":["QUERY_EXPRESSION",["PATH"]]},"semicolon":{"type":"reduce","production":["QUERY_EXPRESSION",["PATH"]]}},{"$":{"type":"reduce","production":["UPDATE_EXPRESSION",["append","PATH","assign","QUERY_EXPRESSION"]]},"semicolon":{"type":"reduce","production":["UPDATE_EXPRESSION",["append","PATH","assign","QUERY_EXPRESSION"]]}},{"rightBracket":{"type":"shift","state":56},"variableName":{"type":"shift","state":34},"true":{"type":"shift","state":38},"false":{"type":"shift","state":39},"null":{"type":"shift","state":40},"string":{"type":"shift","state":41},"number":{"type":"shift","state":42},"nodeName":{"type":"shift","state":36},"nodeNameVariable":{"type":"shift","state":37}},{"comma":{"type":"reduce","production":["PATH",["nodeName","PATH"]]},"rightBracket":{"type":"reduce","production":["PATH",["nodeName","PATH"]]}},{"comma":{"type":"reduce","production":["PATH",["nodeNameVariable","PATH"]]},"rightBracket":{"type":"reduce","production":["PATH",["nodeNameVariable","PATH"]]}},{"variableName":{"type":"shift","state":34},"true":{"type":"shift","state":38},"false":{"type":"shift","state":39},"null":{"type":"shift","state":40},"string":{"type":"shift","state":41},"number":{"type":"shift","state":42},"nodeName":{"type":"shift","state":36},"nodeNameVariable":{"type":"shift","state":37}},{"$":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName","leftBracket","QUERY_EXPRESSION_LIST","rightBracket"]]},"semicolon":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName","leftBracket","QUERY_EXPRESSION_LIST","rightBracket"]]}},{"comma":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName","leftBracket","rightBracket"]]},"rightBracket":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName","leftBracket","rightBracket"]]}},{"rightBracket":{"type":"shift","state":59}},{"rightBracket":{"type":"reduce","production":["QUERY_EXPRESSION_LIST",["QUERY_EXPRESSION","comma","QUERY_EXPRESSION_LIST"]]}},{"comma":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName","leftBracket","QUERY_EXPRESSION_LIST","rightBracket"]]},"rightBracket":{"type":"reduce","production":["QUERY_EXPRESSION",["variableName","leftBracket","QUERY_EXPRESSION_LIST","rightBracket"]]}}]}
 
 /***/ }),
-/* 90 */
+/* 101 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -7906,7 +8436,7 @@ let {
     isObject,
     isFunction,
     isString
-} = __webpack_require__(31);
+} = __webpack_require__(34);
 
 let {
     T_ASSIGN,
@@ -7917,7 +8447,7 @@ let {
     T_NODE_NAME_VARIABLE,
 
     A_DEFAULT
-} = __webpack_require__(17);
+} = __webpack_require__(18);
 
 /**
  *
@@ -8035,13 +8565,13 @@ module.exports = {
 
 
 /***/ }),
-/* 91 */
+/* 102 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let uuidv4 = __webpack_require__(21);
+let uuidv4 = __webpack_require__(25);
 
 let autoId = () => {
     let time = new Date().getTime(); // used to sort by time
@@ -8096,114 +8626,114 @@ module.exports = {
 
 
 /***/ }),
-/* 92 */
+/* 103 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let querystring = __webpack_require__(23);
+let querystring = __webpack_require__(14);
 
-let {
-    deepMergeMap
-} = __webpack_require__(5);
+let helper = __webpack_require__(1);
 
 // TODO opt performance
 // TODO avoid save theme
-// TODO black list for properties
 // TODO expire time
 
 let pagePropsStore = (options = {}) => {
-    let {
-        version = 1.0
-    } = options;
+  let {version = 1.0} = options;
 
-    let key = options.key || getDefaultKey(options);
+  let key = options.key || getDefaultKey(options);
 
-    let set = (props) => {
-        localStorage[key] = JSON.stringify({
-            version,
-            props: deepMergeMap({}, props, '', {
-                blackList: options.blackList
-            })
-        });
-    };
+  let set = (props) => {
+    let attributes = options.whiteList || [];
 
-    let get = (originProps = {}) => {
-        let dataStr = localStorage[key];
-        if (!dataStr) return responseOriginProps(originProps);
+    localStorage[key] = JSON.stringify({
+      version,
+      props : attributes.reduce(
+          (prev, attribute) => {
+            helper.set(prev, attribute, helper.get(props, attribute));
+            return prev;
+          },
+          {})
+    });
+  };
 
-        try {
-            let data = JSON.parse(dataStr);
-            if (data.version < version) {
-                return responseOriginProps(originProps);
-            } else if (data.version < version) {
-                console.error(`unexpected situation happened, storaged data version is bigger than current version. Storaged data version is ${data.version}. Current version is ${version}.`); // eslint-disable-line
-                return responseOriginProps(originProps);
-            } else {
-                // merge dataProps and stored props
-                return deepMergeMap(originProps, data.props);
-            }
-        } catch (err) {
-            return responseOriginProps(originProps);
-        }
-    };
+  let get = (originProps = {}) => {
+    let dataStr = localStorage[key];
+    if (!dataStr)
+      return responseOriginProps(originProps);
 
-    let responseOriginProps = (originProps) => {
-        set(originProps);
-        return originProps;
-    };
-
-    return {
-        get,
-        set
-    };
-};
-
-let getDefaultKey = ({
-    pageQueryKey = 'page'
-} = {}) => { // key should reflect a page
-    let key = `${document.title}-${window.location.pathname}`;
-
-    let obj = querystring.parse(window.location.search.substring(1));
-
-    if (obj && obj[pageQueryKey] !== undefined) {
-        key = `${key}?page=${obj[pageQueryKey]}`;
+    try {
+      let data = JSON.parse(dataStr);
+      if (data.version < version) {
+        return responseOriginProps(originProps);
+      } else if (data.version < version) {
+        console.error(
+            `unexpected situation happened, storaged data version is bigger than current version. Storaged data version is ${
+                                                                                                                             data.version
+                                                                                                                           }. Current version is ${
+                                                                                                                                                   version
+                                                                                                                                                 }.`); // eslint-disable-line
+        return responseOriginProps(originProps);
+      } else {
+        // merge dataProps and stored props
+        return helper.deepMergeMap(originProps, data.props);
+      }
+    } catch (err) {
+      return responseOriginProps(originProps);
     }
+  };
 
-    return key;
+  let responseOriginProps = (originProps) => {
+    set(originProps);
+    return originProps;
+  };
+
+  return {get, set};
 };
+
+let getDefaultKey =
+    ({pageQueryKey = 'page'} = {}) => { // key should reflect a page
+      let key = `${document.title}-${window.location.pathname}`;
+
+      let obj = querystring.parse(window.location.search.substring(1));
+
+      if (obj && obj[pageQueryKey] !== undefined) {
+        key = `${key}?page=${obj[pageQueryKey]}`;
+      }
+
+      return key;
+    };
 
 let wrapPagePropsWithStore = (props, options = {}) => {
-    let {
-        get,
-        set
-    } = pagePropsStore(options);
+  let {get, set} = pagePropsStore(options);
 
-    let originOnsignal = props.onsignal;
+  let originOnsignal = props.onsignal;
 
-    props.onsignal = (signal, data, ctx) => {
-        if (options.signalTypes) {
-            if (options.signalTypes.findIndex((type) => signal.type === type) !== -1) {
-                set(data.props);
-            }
-        } else {
-            set(data.props);
-        }
-        return originOnsignal && originOnsignal(signal, data, ctx);
-    };
+  props.onsignal = (signal, data, ctx) => {
+    if (options.signalTypes) {
+      if (options.signalTypes.findIndex((type) => signal.type === type) !==
+          -1) {
+        set(data.props);
+      }
+    } else {
+      set(data.props);
+    }
+    return originOnsignal && originOnsignal(signal, data, ctx);
+  };
 
-    return get(props);
+  return get(props);
 };
 
 module.exports = {
-    pagePropsStore,
-    wrapPagePropsWithStore
+  pagePropsStore,
+  wrapPagePropsWithStore
 };
 
 
 /***/ }),
-/* 93 */
+/* 104 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8211,7 +8741,7 @@ module.exports = {
 
 const {
    // signal constants
-} = __webpack_require__(33);
+} = __webpack_require__(19);
 
 /**
  * 
@@ -8246,39 +8776,51 @@ module.exports = {
 
 
 /***/ }),
-/* 94 */
+/* 105 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let indexPage = __webpack_require__(95);
+let indexPage = __webpack_require__(106);
+let article = __webpack_require__(124);
 
 module.exports = {
-    indexPage
+    indexPage,
+    article
 };
 
 
 /***/ }),
-/* 95 */
+/* 106 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let SimplePager = __webpack_require__(96);
-let lumineView = __webpack_require__(2);
-let n = __webpack_require__(3);
+let SimplePager = __webpack_require__(36);
+let lumineView = __webpack_require__(3);
+let n = __webpack_require__(2);
 let {
     syncBindWithKeyMap
-} = __webpack_require__(34);
+} = __webpack_require__(20);
 let {
     deliver,
     onSignalType
-} = __webpack_require__(7);
+} = __webpack_require__(5);
 let {
-   // SIGNAL CONSTANTS
-} = __webpack_require__(33);
+    // SIGNAL CONSTANTS
+} = __webpack_require__(19);
+
+// layouts
+let Hn = __webpack_require__(39);
+let Vn = __webpack_require__(42);
+// views
+let FunctionBar = __webpack_require__(43);
+let Card = __webpack_require__(44);
+
+// blogList
+let blogList = __webpack_require__(45);
 
 /**
  *  SimplePager encapsulate notice and loading view.
@@ -8300,57 +8842,94 @@ let {
  */
 
 module.exports = SimplePager(lumineView(({}, ctx) => {
-   //
-   return n('div', 'hello lumine page!');
+    return n(Vn, [
+        n(FunctionBar, {
+            title: 'Arre(ddchen)\'s blog',
+            leftLogos: [n('div', 'about me')],
+            onsignal: onSignalType('click', (signal) => {
+                if (signal.data.sourceType === 'leftLogos') {
+                    if (signal.data.index === 0) {
+                        window.location.href = './project/resume/index.html';
+                    }
+                }
+            })
+        }),
+
+        n('div', {
+            style: {
+                width: 300,
+                padding: 8
+            }
+        }, [
+            blogList.map(({
+                name,
+                date,
+                brief,
+                docId
+            }) => {
+                return n(Card, {
+                    title: name,
+                    style: {
+                        container: {
+                            cursor: 'pointer'
+                        }
+                    },
+                    onsignal: onSignalType('click', () => {
+                        window.location.href= `?page=article&docId=${docId}`;
+                    })
+                }, [
+                    n('div style="color:gray;font-size:14px"', date),
+                    n('div', brief)
+                ])
+            })
+        ])
+
+    ]);
 }, {
-    defaultProps: {
-    }
+    defaultProps: {}
 }));
 
+
 /***/ }),
-/* 96 */
+/* 107 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let lumineView = __webpack_require__(2);
-let n = __webpack_require__(3);
-let PageLoading = __webpack_require__(99);
-let Notice = __webpack_require__(104);
-let {syncBindWithKeyMap} = __webpack_require__(34);
-let Full = __webpack_require__(106);
+let base = __webpack_require__(108);
 
-/**
- *
- * define a simple page view class, which contains page loading and notice.
- */
+module.exports = base({
+    pageColor: 'white',
+    hoverColor: '#90CAF9',
+    blockColor: '#2196F3', // rgb(33,150,243)
+    borderColor: '#1565C0',
+    veilColor: 'rgba(125,125,125,0.6)',
+    fontColor: 'white',
+    noticeColor: 'rgb(2, 40, 51)',
+    shadowColor: 'rgba(100,100,100,0.2)',
 
-module.exports = (PageView) => {
-  let fun = ({props, children}, ctx) => {
-    return n(Full, {}, [
-      n(PageLoading, syncBindWithKeyMap(ctx, {'loading.show' : 'show'})),
+    // half
+    halfBlockColor: 'rgba(33,150,243,0.5)',
 
-      n(Notice, syncBindWithKeyMap(
-                    ctx, {'notice.show' : 'show', 'notice.text' : 'text'})),
+    titleSize: 20,
+    normalSize: 16,
 
-      n(PageView, props, children)
-    ]);
-  };
+    narrowPadding: '4 8 4 8',
+    narrowPaddingTop: 4,
+    narrowPaddingRight: 8,
+    narrowPaddingBottom: 4,
+    narrowPaddingLeft: 8,
 
-  return lumineView(fun, {
-    defaultProps : {
-      // loading in page level
-      loading : {show : false},
-      // notice window
-      notice : {show : false, text : ''}
-    }
-  });
-};
+    narrowMargin: '4 8 4 8',
+
+    contrastBlockColor: 'white',
+    contrastFontColor: 'black'
+});
 
 
 /***/ }),
-/* 97 */
+/* 108 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8358,157 +8937,205 @@ module.exports = (PageView) => {
 
 let {
     styles
-} = __webpack_require__(5);
+} = __webpack_require__(1);
 
-let basics = {
-    pageColor: '#e4e4e4',
-    hoverColor: '#e9ece5',
-    blockColor: '#3b3a36',
-    borderColor: '#b3c2bf',
-    veilColor: 'rgba(60,60,60,0.6)',
-    fontColor: 'white',
-    noticeColor: 'rgb(23, 21, 21)',
+let layout = __webpack_require__(38);
+let Bulk = __webpack_require__(109);
+let Actions = __webpack_require__(110);
+let Widget = __webpack_require__(111);
 
-    titleSize: 20,
-    normalSize: 16,
+module.exports = (basics, custom = {}) => {
+    let bulks = Bulk(basics);
+    let actions = Actions(basics);
+    let widgets = Widget(basics, layout, bulks);
 
-    narrowPadding: '4 8 4 8',
-    narrowMargin: '4 8 4 8',
-
-    contrastBlockColor: 'white',
-    contrastFontColor: 'black'
-};
-
-let container = {
-    position: 'relative',
-    boxSizing: 'border-box',
-    margin: 0,
-    padding: 0,
-    border: 0,
-    borderRadius: 0,
-    overflow: 'auto'
-};
-
-let fullParentHeight = {
-    height: '100%'
-};
-
-let fullParentWidth = {
-    width: '100%'
-};
-
-let fullWindow = styles(container, {
-    position: 'fixed',
-    left: 0,
-    top: 0,
-}, fullParentWidth, fullParentHeight);
-
-let fullParent = styles(container, fullParentWidth, fullParentHeight);
-
-let bulk = styles(container, {
-    minWidth: 40,
-    backgroundColor: basics.blockColor,
-    color: basics.fontColor
-});
-
-let contrastBulk = styles(bulk, {
-    backgroundColor: basics.contrastBlockColor,
-    color: basics.contrastFontColor
-});
-
-let oneLineBulk = styles(bulk, {
-    padding: basics.narrowPadding,
-    fontSize: basics.normalSize,
-    textAlign: 'center',
-    lineHeight: 20,
-    textDecoration: 'none',
-    border: 'none',
-    color: basics.fontColor
-});
-
-let modalBulk = styles(oneLineBulk, contrastBulk, {
-    display: 'inline-block'
-});
-
-let flat = {
-    appearance: 'none',
-    '-webkit-appearance': 'none',
-    '-moz-appearance': 'none',
-    boxShadow: 'none',
-    borderRadius: 'none',
-    border: 0
-};
-
-let inputBox = styles(contrastBulk, flat, {
-    width: 260,
-    padding: basics.narrowPadding,
-    backgroundColor: basics.fontColor
-});
-
-let textAreaBox = styles(inputBox, {
-    width: 360,
-    height: 200,
-    outline: 'none',
-    resize: 'none',
-    overflow: 'auto',
-    border: `1px solid ${basics.borderColor}`,
-    borderRadius: 5,
-    fontSize: 16
-});
-
-let underLineBorder = {
-    border: 0,
-    borderRadius: 0,
-    'border-bottom': `1px solid ${basics.borderColor}`
-};
-
-let underLineFocus = {
-    'border-bottom': `1px solid ${basics.blockColor}`
-};
-
-let actions = {
-    cling: {
-        margin: 0,
-        padding: 0,
-        boxSizing: 'border-box'
-    },
-
-    hover: {
-        backgroundColor: basics.hoverColor
-    },
-
-    active: {
-        backgroundColor: basics.hoverColor
-    },
-
-    focus: {
-        outline: 'none'
+    if (typeof custom === 'function') {
+        custom = custom(basics, layout, bulks);
     }
-};
 
-module.exports = {
-    basics,
+    bulks = Object.assign(bulks, custom.bulks || {});
+    actions = Object.assign(actions, custom.actions || {});
+    widgets = Object.assign(widgets, custom.widgets || {});
 
-    bulk,
-    oneLineBulk,
-    modalBulk,
-    inputBox,
-    textAreaBox,
-    underLineBorder,
-    underLineFocus,
-    container,
-
-    fullWindow,
-    fullParent,
-    fullParentWidth,
-    fullParentHeight,
-
-    actions
+    return Object.assign({
+        basics,
+        actions
+    }, layout, bulks, actions, widgets);
 };
 
 
 /***/ }),
-/* 98 */
+/* 109 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {
+    styles
+} = __webpack_require__(1);
+
+let layout = __webpack_require__(38);
+
+let {
+    container
+} = layout;
+
+module.exports = (basics) => {
+    let bulk = styles(container, {
+        minWidth: 40,
+        backgroundColor: basics.blockColor,
+        color: basics.fontColor
+    });
+
+    let contrastBulk = styles(bulk, {
+        backgroundColor: basics.contrastBlockColor,
+        color: basics.contrastFontColor
+    });
+
+    let oneLineBulk = styles(bulk, {
+        padding: basics.narrowPadding,
+        fontSize: basics.normalSize,
+        textAlign: 'center',
+        lineHeight: 20,
+        textDecoration: 'none',
+        border: 'none',
+        color: basics.fontColor
+    });
+
+    let flatOneLineBulk = styles(oneLineBulk, {
+        display: 'inline-block',
+        backgroundColor: basics.contrastBlockColor,
+        color: basics.blockColor
+    });
+
+    let modalBulk = styles(oneLineBulk, contrastBulk, {
+        display: 'inline-block',
+        boxShadow: `3px 3px 5px ${basics.shadowColor}`
+    });
+
+    return {
+        bulk,
+        contrastBulk,
+        oneLineBulk,
+        modalBulk,
+        flatOneLineBulk
+    };
+}
+
+
+/***/ }),
+/* 110 */
+/***/ (function(module, exports) {
+
+module.exports = (basics) => {
+    return {
+        cling: {
+            margin: 0,
+            padding: 0,
+            boxSizing: 'border-box'
+        },
+
+        hover: {
+            backgroundColor: basics.hoverColor
+        },
+
+        active: {
+            backgroundColor: basics.hoverColor
+        },
+
+        focus: {
+            outline: 'none'
+        },
+
+        flatHover: {
+            color: basics.hoverColor
+        },
+
+        flatActive: {
+            color: basics.hoverColor
+        }
+    }
+};
+
+
+/***/ }),
+/* 111 */
+/***/ (function(module, exports, __webpack_require__) {
+
+let {
+    styles
+} = __webpack_require__(1);
+
+module.exports = (basics, layout, bulks) => {
+    let {
+        contrastBulk
+    } = bulks;
+    let {
+        flat
+    } = layout;
+
+    let cardBox = styles(contrastBulk, flat, {
+        border: `1px solid ${basics.shadowColor}`,
+        boxShadow: `3px 3px 5px ${basics.shadowColor}`,
+        borderRadius: 2
+    });
+
+    let inputBox = styles(contrastBulk, flat, {
+        width: 260,
+        padding: basics.narrowPadding,
+        backgroundColor: basics.fontColor
+    });
+
+    let textAreaBox = styles(inputBox, {
+        width: 360,
+        height: 200,
+        outline: 'none',
+        resize: 'none',
+        overflow: 'auto',
+        border: `1px solid ${basics.borderColor}`,
+        borderRadius: 5,
+        fontSize: 16
+    });
+
+    let underLineBorder = {
+        border: 0,
+        borderRadius: 0,
+        'border-bottom': `1px solid ${basics.borderColor}`
+    };
+
+    let underLineFocus = {
+        paddingBottom: basics.narrowPaddingBottom - 1,
+        'border-bottom': `2px solid ${basics.blockColor}`
+    };
+
+    let flatRippleMask = {
+        content: '',
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        width: 5,
+        height: 5,
+        backgroundColor: basics.halfBlockColor,
+        opacity: '0',
+        borderRadius: '100%',
+        transform: 'scale(1, 1) translate(-50%)',
+        transformOrigin: '50% 50%'
+    };
+
+    return {
+        inputBox,
+        textAreaBox,
+        underLineBorder,
+        underLineFocus,
+        flatRippleMask,
+        cardBox
+    };
+};
+
+
+/***/ }),
+/* 112 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8516,7 +9143,7 @@ module.exports = {
 
 let {
     isMapObject
-} = __webpack_require__(5);
+} = __webpack_require__(1);
 
 let {
     mount,
@@ -8587,7 +9214,7 @@ module.exports = (classTable) => {
                     });
                 }
                 let styleRuleContent = parseStyle(classCnt, {
-                    valueWrapper: (value) => `${value} !important`
+                    valueWrapper: (value) => `${value !== ''? value: '\'\''} !important`
                 });
                 styleCssRules += `\n${styleRuleName} {${styleRuleContent}}`;
             }
@@ -8605,18 +9232,18 @@ module.exports = (classTable) => {
 
 
 /***/ }),
-/* 99 */
+/* 113 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let n = __webpack_require__(3);
-let lumineView = __webpack_require__(2);
+let n = __webpack_require__(2);
+let lumineView = __webpack_require__(3);
 
-let TextLoading = __webpack_require__(100);
-let PageMask = __webpack_require__(101);
-let Empty = __webpack_require__(103);
+let TextLoading = __webpack_require__(114);
+let PageMask = __webpack_require__(115);
+let Empty = __webpack_require__(117);
 
 module.exports = lumineView(({
     props,
@@ -8643,15 +9270,15 @@ module.exports = lumineView(({
 
 
 /***/ }),
-/* 100 */
+/* 114 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let n = __webpack_require__(3);
+let n = __webpack_require__(2);
 
-let lumineView = __webpack_require__(2);
+let lumineView = __webpack_require__(3);
 
 // TODO easy disappear for loading view
 module.exports = lumineView(({
@@ -8699,15 +9326,15 @@ module.exports = lumineView(({
 
 
 /***/ }),
-/* 101 */
+/* 115 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let FullWindow = __webpack_require__(102);
-let lumineView = __webpack_require__(2);
-let n = __webpack_require__(3);
+let FullWindow = __webpack_require__(116);
+let lumineView = __webpack_require__(3);
+let n = __webpack_require__(2);
 
 module.exports = lumineView(({
     props,
@@ -8728,7 +9355,7 @@ module.exports = lumineView(({
 
 
 /***/ }),
-/* 102 */
+/* 116 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8737,13 +9364,13 @@ module.exports = lumineView(({
 let {
     n
 } = __webpack_require__(6);
-let lumineView = __webpack_require__(2);
+let lumineView = __webpack_require__(3);
 let {
     styles
-} = __webpack_require__(5);
+} = __webpack_require__(1);
 let {
     Signal
-} = __webpack_require__(7);
+} = __webpack_require__(5);
 
 module.exports = lumineView(({
     props,
@@ -8759,7 +9386,9 @@ module.exports = lumineView(({
     }, children);
 }, {
     defaultProps: {
-        style: (theme) => styles(theme.fullWindow)
+        style: (theme) => {
+            return styles(theme.fullWindow);
+        }
     },
 
     defaultChildren: []
@@ -8767,14 +9396,14 @@ module.exports = lumineView(({
 
 
 /***/ }),
-/* 103 */
+/* 117 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let n = __webpack_require__(3);
-let lumineView = __webpack_require__(2);
+let n = __webpack_require__(2);
+let lumineView = __webpack_require__(3);
 
 module.exports = lumineView(() => {
     return n('div', {
@@ -8787,25 +9416,25 @@ module.exports = lumineView(() => {
 
 
 /***/ }),
-/* 104 */
+/* 118 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let n = __webpack_require__(3);
-let lumineView = __webpack_require__(2);
+let n = __webpack_require__(2);
+let lumineView = __webpack_require__(3);
 let {
     Signal
-} = __webpack_require__(7);
-
-let {
-    styles
 } = __webpack_require__(5);
 
 let {
+    styles
+} = __webpack_require__(1);
+
+let {
     compileTreeScript
-} = __webpack_require__(105);
+} = __webpack_require__(119);
 
 let S_HideNotice = compileTreeScript('.props.show=false');
 
@@ -8853,7 +9482,7 @@ module.exports = lumineView(({
 
 
 /***/ }),
-/* 105 */
+/* 119 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
@@ -8862,7 +9491,7 @@ module.exports = lumineView(({
 let {
     parseStrToAst,
     checkAST
-} = __webpack_require__(14);
+} = __webpack_require__(15);
 
 let compileTreeScript = (treeScriptCode, {
     variableStub
@@ -8887,22 +9516,518 @@ module.exports = {
 
 
 /***/ }),
-/* 106 */
+/* 120 */
 /***/ (function(module, exports, __webpack_require__) {
 
 "use strict";
 
 
-let {n} = __webpack_require__(6);
-let lumineView = __webpack_require__(2);
-let {styles} = __webpack_require__(5);
+let rippleClassTables = __webpack_require__(121);
+let Buttoner = __webpack_require__(123);
+let {
+    styles
+} = __webpack_require__(1);
 
-module.exports =
-    lumineView(({props, children}) => { return n('div', props, children); }, {
-      defaultProps : {style : (theme) => styles(theme.fullParent)},
+module.exports = Buttoner({
+    defaultProps: {
+        style: (theme) => styles(theme.oneLineBulk, {
+            cursor: 'pointer'
+        })
+    },
 
-      defaultChildren : [ '' ]
+    classTable: (theme) => {
+        return Object.assign(rippleClassTables({
+            theme
+        }), {
+            'btn:hover': theme.actions.hover,
+            'btn:active': theme.actions.active,
+            'btn:focus': theme.actions.focus
+        });
+    }
+});
+
+
+/***/ }),
+/* 121 */
+/***/ (function(module, exports, __webpack_require__) {
+
+let ripple = __webpack_require__(122);
+
+module.exports = ({
+    theme,
+    frameName = 'ripple',
+    className = 'btn'
+}) => {
+    return {
+        [`@keyframes ${frameName}`]: ripple,
+        [`${className}::after`]: theme.flatRippleMask,
+        [`${className}:focus:not(:active)::after`]: ({
+            getClassName
+        }) => {
+            return {
+                animation: `${getClassName(frameName)} 1s ease-out`
+            };
+        }
+    }
+};
+
+
+/***/ }),
+/* 122 */
+/***/ (function(module, exports) {
+
+module.exports = `
+    0% {
+        transform: scale(0, 0);
+        opacity: 1;
+    }
+    20% {
+        transform: scale(25, 25);
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        transform: scale(40, 40);
+    }`;
+
+
+/***/ }),
+/* 123 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let {
+    n
+} = __webpack_require__(6);
+let lumineViewer = __webpack_require__(37);
+let {
+    Signal
+} = __webpack_require__(5);
+let {
+    styles
+} = __webpack_require__(1);
+
+module.exports = lumineViewer(({
+    props,
+    children
+}, {
+    notify,
+    getClassName
+}) => {
+    // TODO validate
+    let attributes = {
+        'class': `${getClassName('btn')}`,
+        style: props.style,
+        onclick: () => {
+            notify(Signal('click'));
+        }
+    };
+    if (props.id) {
+        attributes.id = props.id;
+    }
+    return n('button', attributes, children[0]);
+});
+
+
+/***/ }),
+/* 124 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let SimplePager = __webpack_require__(36);
+let lumineView = __webpack_require__(3);
+let n = __webpack_require__(2);
+let {
+    syncBindWithKeyMap
+} = __webpack_require__(20);
+let {
+    deliver,
+    onSignalType
+} = __webpack_require__(5);
+let {
+    // SIGNAL CONSTANTS
+} = __webpack_require__(19);
+let querystring = __webpack_require__(14);
+
+// layouts
+let Hn = __webpack_require__(39);
+let Vn = __webpack_require__(42);
+// views
+let FunctionBar = __webpack_require__(43);
+let Card = __webpack_require__(44);
+
+let articles = __webpack_require__(125);
+let blogList = __webpack_require__(45);
+
+/**
+ *  SimplePager encapsulate notice and loading view.
+ *  
+ *      .notice.text
+ *      .notice.show
+ *      .loading.show
+ */
+
+/**
+ * syncBindWithKeyMap:
+ *     sync child props with parent props
+ *     demo: n(Input, syncBindWithKeyMap(ctx, {[parent props]: 'value'}, {bindedProps: {}}))
+ */
+
+/**
+ * deliver signal 
+ *     demo: n(Button, {onsignal: onSignalType('click', deliver(ctx, SIGNAL_TYPE))}, 'save')
+ */
+
+module.exports = SimplePager(lumineView(({}, ctx) => {
+    let qs = querystring.parse(window.location.search.substring(1));
+    let article = articles[qs.docId];
+
+    let blog = blogList.find(({
+        docId
+    }) => docId === qs.docId);
+
+    return n(Vn, [
+        n(FunctionBar, {
+            title: blog.name,
+            leftLogos: [
+                n('div', '<')
+            ],
+            onsignal: onSignalType('click', (signal) => {
+                if (signal.data.sourceType === 'leftLogos') {
+                    if (signal.data.index === 0) {
+                        window.location.href = '?page=indexPage';
+                    }
+                }
+            })
+
+        }),
+
+        n('div', {
+            style: {
+                padding: 8
+            }
+        }, [article])
+
+    ]);
+}, {
+    defaultProps: {}
+}));
+
+
+/***/ }),
+/* 125 */
+/***/ (function(module, exports, __webpack_require__) {
+
+let flexible_UI_test_restraints_design = __webpack_require__(126);
+
+module.exports = {
+    flexible_UI_test_restraints_design
+};
+
+
+/***/ }),
+/* 126 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let n = __webpack_require__(2);
+let Toc = __webpack_require__(127);
+let Hn = __webpack_require__(39);
+
+let paraTitle = (name) => n(`h3 id="${name}"`, name);
+
+module.exports = n('div', [
+    n('h2 style="text-align:center"', 'flexible UI test restraints design'),
+    n('div style="text-align:center;color:gray;"', '2017-09-27 Arre'),
+
+    n(Toc, {
+        toc: [{
+            name: 'Introduction'
+        }, {
+            name: 'Problems'
+        }, {
+            name: 'Thought'
+        }, {
+            name: 'Position restraint - Grid method'
+        }, {
+            name: 'Content restraint'
+        }, {
+            name: 'Style restraint'
+        }, {
+            name: 'Other restraint'
+        }, {
+            name: 'Description UI by using restraints'
+        }, {
+            name: 'Algorithm to solve the description'
+        }]
+    }),
+
+    paraTitle('Introduction'),
+    n('p style="font-style:italic"', 'UI changes day by day, how to define the correct state of UI become a problem. If the restraints we designed are too strong, they will be useless, because we have to change them everyday. If the restraints we designed are too week, they won\'t be able to guard the UI.'),
+
+    paraTitle('Problems'),
+    n('ul', [
+        n('li', 'How to measure a UI\'s state? After all, UI contains a lot of information, and can be different in difference devices.'),
+        n('li', 'The frequency of modifying UI is high. (Not absolutly, but for some products like user-level products, may changed fast)')
+    ]),
+
+    paraTitle('Thought'),
+    n('ul', [
+        n('li', 'Break down the information of UI into some dimensions.'),
+        n('li', 'Design an approach to balance accuracy and flexibility for each dimension.'),
+        n('li', 'The parameter of the dimension must be easy to set and adjust.')
+    ]),
+    n('p', 'This article provides a simple approach based on the two thoughts. It mainly considers to add position, content and style restraints to UI.'),
+
+    paraTitle('Position restraint - Grid method'),
+    n('p', 'Divide page into m * n matrix. For a specific UI, it will be located in an area, which can be represented by pair of coordinates (x1, y1), (x2, y2). For example:'),
+    n(Hn, {
+        mode: 'partion',
+        leftPartions: [300]
+    }, [
+        n('img src="./img/position_restraint_demo.png"'),
+        n('ul', [
+            n('li', 'step1: divide screen into 4 * 4 parts.'),
+            n('li', 'step2: we can describe there is a button in area (0,0)-(0,0).')
+        ])
+    ]),
+
+    n('h4', 'flexibility'),
+    n('p', 'The flexibility of grid method is at m and n, which we used to divide the page. If we set m and n small, the position information will be rough. If we set m and n big, the position information will be precision.'),
+
+    n('p', 'In some simple situations:'),
+    n('ul', [
+        n('li', 'We can define rough rate like 1.5 to calculate the m and the n for a specific UI.'),
+        n('li', 'In a 2 * 2 grids, we can simply to say a button located in left-top or right-top or left-bottom or right-bottom.')
+    ]),
+
+    n('h4', 'usablility'),
+
+    n('p', 'The grid method is easy to set and adjust, we can use vision to make desicion. We can increase the grid from 1 * 1 until we think it is ok.'),
+
+    n('h4', 'combinators'),
+    n('p', 'We can compose the relationship between area and UI element with some simple combinators.'),
+    n('ul', [
+        n('li', n(Hn, {
+            mode: 'partion',
+            leftPartions: [60],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', 'In'), 'UI element is in area A.'
+        ])),
+        n('li', n(Hn, {
+            mode: 'partion',
+            leftPartions: [60],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', 'Not in'),
+            'UI element not is in area A.'
+        ])),
+        n('li', n(Hn, {
+            mode: 'partion',
+            leftPartions: [60],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', 'And'), 'UI element is in area A and area B.'
+        ])),
+        n('li', n(Hn, {
+            mode: 'partion',
+            leftPartions: [60],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', 'Or'), 'UI element is in area A or area B.'
+        ]))
+    ]),
+
+    paraTitle('Content restraint'),
+    n('img src="./img/content_restraint_demo.png"'),
+    n('p', 'The content of UI element is the main meaning that the UI try to delivery. The content of button is test, that imply when we click the button, it will run some test stuff.'),
+
+    n('h4', 'content extractor'),
+    n('div', 'A content extractor is a combinator used to extract content from the UI element’s some dimensions.'),
+
+    n('p', 'common dimensions'),
+    n('ul', [
+        n('li', 'textContent'),
+        n('li', 'image url'),
+        n('li', 'textContent'),
+        n('li', 'content of css pseudo-class in web scene'),
+        n('li', 'the combination of all children’s content')
+    ]),
+
+    n('h4', 'combinator'),
+    n('ul', [
+        n('li', n(Hn, {
+            mode: 'partion',
+            leftPartions: [100],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', 'Match'), 'eg: UI element’s image url matches content A'
+        ])),
+        n('li', n(Hn, {
+            mode: 'partion',
+            leftPartions: [100],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', 'Not match'), 'eg: UI element’s text content not matches content A.'
+        ]))
+    ]),
+
+    paraTitle('Style restraint'),
+    n('p', 'The style of UI elements.'),
+
+    n('h4', 'common styles'),
+    n('ul', [
+        n('li', 'font size'),
+        n('li', 'color'),
+        n('li', 'background-color')
+    ]),
+    n('h4', 'combinator'),
+    n('ul', [
+        n('li', n(Hn, {
+            mode: 'partion',
+            leftPartions: [100],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', 'Match'), 'eg: UI element’s style matches content A'
+        ])),
+        n('li', n(Hn, {
+            mode: 'partion',
+            leftPartions: [100],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', 'Not match'), 'eg: UI element’s style not matches content A.'
+        ]))
+    ]),
+
+    paraTitle('Other restraint'),
+    n('p', 'Like tagName, attributes etc.'),
+
+    paraTitle('Description UI by using restraints'),
+    n('p', 'Using restraint rules to describe a UI element. Specify position area, content matching, style matching.'),
+    n('p', 'Eg: There exists a UI element, located at area (0, 0)-(0, 0) in (5 * 6) grid, contains content “test”, has border, background color is white.'),
+
+    paraTitle('Algorithm to solve the description'),
+    n('p', 'Filter all elements according to the UI restraints description. What’s left are the target elements.')
+]);
+
+
+/***/ }),
+/* 127 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let n = __webpack_require__(2);
+let lumineView = __webpack_require__(3);
+let rippleClassTables = __webpack_require__(121);
+let {
+    styles
+} = __webpack_require__(1);
+
+/**
+ *
+ * TOC data = [
+ *  {
+ *      name, String
+ *      id,
+ *      next: TOC DATA
+ *  }
+ * ] 
+ */
+module.exports = lumineView(({
+    props
+}, {
+    getClassName
+}) => {
+    return renderToc(props.toc, {
+        container: props.style.container,
+        nameItem: props.style.nameItem,
+        itemClass: getClassName('tocItem')
     });
+}, {
+    defaultProps: {
+        style: (theme) => {
+            return {
+                container: styles(theme.contrastBulk, {
+                    padding: theme.basics.narrowPadding
+                }),
+                nameItem: styles(theme.flatOneLineBulk)
+            };
+        },
+        toc: []
+    },
+
+    classTable: (theme) => {
+        return Object.assign(rippleClassTables({
+            className: 'tocItem',
+            theme
+        }), {
+            'tocItem:hover': theme.actions.flatHover,
+            'tocItem:active': theme.actions.flatActive,
+            'tocItem:focus': theme.actions.focus
+        });
+    }
+});
+
+let renderToc = (toc, options) => {
+    return n('div', {
+        style: options.container
+    }, [
+        toc.map(({
+            name,
+            id,
+            next
+        }) => {
+            id = id || name;
+            return n('div', [
+                n(`a href="#${id}" class=${options.itemClass}`, {
+                    style: options.nameItem
+                }, name),
+                next && next.length && renderToc(next, options)
+            ]);
+        })
+    ]);
+};
 
 
 /***/ })
