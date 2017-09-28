@@ -10154,7 +10154,7 @@ a.right = &c;
     n('p', 'If we simply use std::vector as stack, out stack-base simulation program will be slow.'),
     n('strong', 'The question is can we write stack-base simulation code which fast than recursion.'),
 
-    n('Experiment 3'),
+    paraTitle('Experiment 3'),
     n('p', 'Let\'s just change the stack-base simulation code from experiment 2. This time we use array, and we allocate memory at first (once).'),
 
     n('h4', 'stack-base simulation code (c++)'),
@@ -10188,7 +10188,7 @@ a.right = &c;
     list([
         'In js, stack-base simulation and recursion is the same fast. (array simulates stack)',
         'The key point to make stack-base simulation fater than recursion is to find a better stack for you problem.',
-        'In lower-level language which can control memeory, if we know the depth of recursion, we can use an array to simulate stack. We allocate memery at first (this trick will avoid multiple times memory allocating.). This kind of stack-simulation will be fast. If we want to rewrite a recursion code for better performance, we can use this trick.'
+        'In lower-level language which can control memeory, if we know the depth of recursion, we can use an array to simulate stack. We allocate memery at first (this trick will avoid multiple times memory allocating). This kind of stack-simulation will be fast. If we want to rewrite a recursion code for better performance, we can use this trick.'
     ])
 ]);
 
