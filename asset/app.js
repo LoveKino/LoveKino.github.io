@@ -3227,6 +3227,11 @@ module.exports = [{
     date: '2017-09-27',
     brief: 'UI changes day by day, how to define the correct state of UI become a problem. If the restraints we designed are too strong, they will be useless, because we have to change them everyday. If the restraints we designed are too week, they won\'t be able to guard the UI.',
     docId: 'flexible_UI_test_restraints_design'
+}, {
+    name: 'performance analysis between recursive and stack-base none-recursive simulation',
+    date: '2017-09-09',
+    brief: 'In the bottom, recursive is running on the stack in memory. It\'s a top-down way to ergodic question tree. We can simulate it by using a stack to do the DFT (Depth First Traversal). How about the performance between them, what kind of conclusions we can get?',
+    docId: 'performance_analysis_between_recursive_and_stack_base_none_recursive_simulation'
 }];
 
 
@@ -8855,12 +8860,7 @@ module.exports = SimplePager(lumineView(({}, ctx) => {
             })
         }),
 
-        n('div', {
-            style: {
-                width: 300,
-                padding: 8
-            }
-        }, [
+        n(Hn, [
             blogList.map(({
                 name,
                 date,
@@ -8871,19 +8871,20 @@ module.exports = SimplePager(lumineView(({}, ctx) => {
                     title: name,
                     style: {
                         container: {
-                            cursor: 'pointer'
+                            cursor: 'pointer',
+                            width: 300,
+                            margin: 8
                         }
                     },
                     onsignal: onSignalType('click', () => {
-                        window.location.href= `?page=article&docId=${docId}`;
+                        window.location.href = `?page=article&docId=${docId}`;
                     })
                 }, [
                     n('div style="color:gray;font-size:14px"', date),
                     n('div', brief)
-                ])
+                ]);
             })
         ])
-
     ]);
 }, {
     defaultProps: {}
@@ -9723,9 +9724,11 @@ module.exports = SimplePager(lumineView(({}, ctx) => {
 /***/ (function(module, exports, __webpack_require__) {
 
 let flexible_UI_test_restraints_design = __webpack_require__(126);
+let performance_analysis_between_recursive_and_stack_base_none_recursive_simulation = __webpack_require__(129)
 
 module.exports = {
-    flexible_UI_test_restraints_design
+    flexible_UI_test_restraints_design,
+    performance_analysis_between_recursive_and_stack_base_none_recursive_simulation
 };
 
 
@@ -9737,74 +9740,53 @@ module.exports = {
 
 
 let n = __webpack_require__(2);
-let Toc = __webpack_require__(127);
-let Hn = __webpack_require__(39);
 
-let paraTitle = (name) => n(`h3 id="${name}"`, name);
+let {
+    paraTitle,
+    list,
+    lr,
+    article
+} = __webpack_require__(128)();
 
-module.exports = n('div', [
-    n('h2 style="text-align:center"', 'flexible UI test restraints design'),
-    n('div style="text-align:center;color:gray;"', '2017-09-27 Arre'),
-
-    n(Toc, {
-        toc: [{
-            name: 'Introduction'
-        }, {
-            name: 'Problems'
-        }, {
-            name: 'Thought'
-        }, {
-            name: 'Position restraint - Grid method'
-        }, {
-            name: 'Content restraint'
-        }, {
-            name: 'Style restraint'
-        }, {
-            name: 'Other restraint'
-        }, {
-            name: 'Description UI by using restraints'
-        }, {
-            name: 'Algorithm to solve the description'
-        }]
-    }),
-
-    paraTitle('Introduction'),
-    n('p style="font-style:italic"', 'UI changes day by day, how to define the correct state of UI become a problem. If the restraints we designed are too strong, they will be useless, because we have to change them everyday. If the restraints we designed are too week, they won\'t be able to guard the UI.'),
-
+module.exports = article({
+    title: 'flexible UI test restraints design',
+    date: '2017-09-27',
+    author: 'Arre',
+    introduction: 'UI changes day by day, how to define the correct state of UI become a problem. If the restraints we designed are too strong, they will be useless, because we have to change them everyday. If the restraints we designed are too week, they won\'t be able to guard the UI.'
+}, [
     paraTitle('Problems'),
-    n('ul', [
-        n('li', 'How to measure a UI\'s state? After all, UI contains a lot of information, and can be different in difference devices.'),
-        n('li', 'The frequency of modifying UI is high. (Not absolutly, but for some products like user-level products, may changed fast)')
+    list([
+        'How to measure a UI\'s state? After all, UI contains a lot of information, and can be different in difference devices.',
+        'The frequency of modifying UI is high. (Not absolutly, but for some products like user-level products, may changed fast)'
     ]),
 
     paraTitle('Thought'),
-    n('ul', [
-        n('li', 'Break down the information of UI into some dimensions.'),
-        n('li', 'Design an approach to balance accuracy and flexibility for each dimension.'),
-        n('li', 'The parameter of the dimension must be easy to set and adjust.')
+    list([
+        'Break down the information of UI into some dimensions.',
+        'Design an approach to balance accuracy and flexibility for each dimension.',
+        'The parameter of the dimension must be easy to set and adjust.'
     ]),
+
     n('p', 'This article provides a simple approach based on the two thoughts. It mainly considers to add position, content and style restraints to UI.'),
 
     paraTitle('Position restraint - Grid method'),
     n('p', 'Divide page into m * n matrix. For a specific UI, it will be located in an area, which can be represented by pair of coordinates (x1, y1), (x2, y2). For example:'),
-    n(Hn, {
-        mode: 'partion',
-        leftPartions: [300]
-    }, [
+    lr(
         n('img src="./img/position_restraint_demo.png"'),
-        n('ul', [
-            n('li', 'step1: divide screen into 4 * 4 parts.'),
-            n('li', 'step2: we can describe there is a button in area (0,0)-(0,0).')
-        ])
-    ]),
+        list([
+            'step1: divide screen into 4 * 4 parts.',
+            'step2: we can describe there is a button in area (0,0)-(0,0).'
+        ]),
+        300
+    ),
 
     n('h4', 'flexibility'),
     n('p', 'The flexibility of grid method is at m and n, which we used to divide the page. If we set m and n small, the position information will be rough. If we set m and n big, the position information will be precision.'),
 
     n('p', 'In some simple situations:'),
-    n('ul', [
-        n('li', 'We can define rough rate like 1.5 to calculate the m and the n for a specific UI.'),
-        n('li', 'In a 2 * 2 grids, we can simply to say a button located in left-top or right-top or left-bottom or right-bottom.')
+    list([
+        'We can define rough rate like 1.5 to calculate the m and the n for a specific UI.',
+        'In a 2 * 2 grids, we can simply to say a button located in left-top or right-top or left-bottom or right-bottom.'
     ]),
 
     n('h4', 'usablility'),
@@ -9813,52 +9795,11 @@ module.exports = n('div', [
 
     n('h4', 'combinators'),
     n('p', 'We can compose the relationship between area and UI element with some simple combinators.'),
-    n('ul', [
-        n('li', n(Hn, {
-            mode: 'partion',
-            leftPartions: [60],
-            style: {
-                container: {
-                    display: 'inline-block'
-                }
-            }
-        }, [
-            n('strong', 'In'), 'UI element is in area A.'
-        ])),
-        n('li', n(Hn, {
-            mode: 'partion',
-            leftPartions: [60],
-            style: {
-                container: {
-                    display: 'inline-block'
-                }
-            }
-        }, [
-            n('strong', 'Not in'),
-            'UI element not is in area A.'
-        ])),
-        n('li', n(Hn, {
-            mode: 'partion',
-            leftPartions: [60],
-            style: {
-                container: {
-                    display: 'inline-block'
-                }
-            }
-        }, [
-            n('strong', 'And'), 'UI element is in area A and area B.'
-        ])),
-        n('li', n(Hn, {
-            mode: 'partion',
-            leftPartions: [60],
-            style: {
-                container: {
-                    display: 'inline-block'
-                }
-            }
-        }, [
-            n('strong', 'Or'), 'UI element is in area A or area B.'
-        ]))
+    list([
+        lr('In', 'UI element is in area A.', 60),
+        lr('Not in', 'UI element not is in area A.', 60),
+        lr('And', 'UI element is in area A and area B.', 60),
+        lr('Or', 'UI element is in area A or area B.', 60)
     ]),
 
     paraTitle('Content restraint'),
@@ -9869,73 +9810,34 @@ module.exports = n('div', [
     n('div', 'A content extractor is a combinator used to extract content from the UI element’s some dimensions.'),
 
     n('p', 'common dimensions'),
-    n('ul', [
-        n('li', 'textContent'),
-        n('li', 'image url'),
-        n('li', 'textContent'),
-        n('li', 'content of css pseudo-class in web scene'),
-        n('li', 'the combination of all children’s content')
+    list([
+        'textContent',
+        'image url',
+        'textContent',
+        'content of css pseudo-class in web scene',
+        'the combination of all children’s content'
     ]),
 
     n('h4', 'combinator'),
-    n('ul', [
-        n('li', n(Hn, {
-            mode: 'partion',
-            leftPartions: [100],
-            style: {
-                container: {
-                    display: 'inline-block'
-                }
-            }
-        }, [
-            n('strong', 'Match'), 'eg: UI element’s image url matches content A'
-        ])),
-        n('li', n(Hn, {
-            mode: 'partion',
-            leftPartions: [100],
-            style: {
-                container: {
-                    display: 'inline-block'
-                }
-            }
-        }, [
-            n('strong', 'Not match'), 'eg: UI element’s text content not matches content A.'
-        ]))
+    list([
+        lr('Match', 'eg: UI element’s image url matches content A'),
+        lr('Not match', 'eg: UI element’s text content not matches content A.')
     ]),
 
     paraTitle('Style restraint'),
     n('p', 'The style of UI elements.'),
 
     n('h4', 'common styles'),
-    n('ul', [
-        n('li', 'font size'),
-        n('li', 'color'),
-        n('li', 'background-color')
+    list([
+        'font size',
+        'color',
+        'background-color'
     ]),
+
     n('h4', 'combinator'),
-    n('ul', [
-        n('li', n(Hn, {
-            mode: 'partion',
-            leftPartions: [100],
-            style: {
-                container: {
-                    display: 'inline-block'
-                }
-            }
-        }, [
-            n('strong', 'Match'), 'eg: UI element’s style matches content A'
-        ])),
-        n('li', n(Hn, {
-            mode: 'partion',
-            leftPartions: [100],
-            style: {
-                container: {
-                    display: 'inline-block'
-                }
-            }
-        }, [
-            n('strong', 'Not match'), 'eg: UI element’s style not matches content A.'
-        ]))
+    list([
+        lr('Match', 'eg: UI element’s style matches content A'),
+        lr('Not match', 'eg: UI element’s style not matches content A.')
     ]),
 
     paraTitle('Other restraint'),
@@ -10028,6 +9930,267 @@ let renderToc = (toc, options) => {
         })
     ]);
 };
+
+
+/***/ }),
+/* 128 */
+/***/ (function(module, exports, __webpack_require__) {
+
+let n = __webpack_require__(2);
+let Toc = __webpack_require__(127);
+let Hn = __webpack_require__(39);
+
+module.exports = () => {
+    let paraNames = [];
+
+    let article = ({
+        title,
+        date,
+        author,
+        introduction
+    }, content) => {
+        return n('div', [
+            articleTitle(title, date, author),
+
+            n(Toc, {
+                toc: paraNames.map((name) => {
+                    return {
+                        name
+                    };
+                })
+            }),
+
+            introduction && introductionPara(introduction),
+
+            content
+        ]);
+    };
+
+    let paraTitle = (name) => {
+        paraNames.push(name);
+        return n(`h3 id="${name}"`, name);
+    };
+
+    let introductionPara = (cnt) => {
+        return [
+            paraTitle('Introduction'),
+            n('p style="font-style:italic"', cnt)
+        ];
+    };
+
+    let list = (contents) => {
+        return n('ul', [
+            contents.map((cnt) => n('li', cnt))
+        ]);
+    };
+
+    let lr = (left, right, leftLength = 100) => {
+        return n(Hn, {
+            mode: 'partion',
+            leftPartions: [leftLength],
+            style: {
+                container: {
+                    display: 'inline-block'
+                }
+            }
+        }, [
+            n('strong', left), right
+        ]);
+    };
+
+    let articleTitle = (title, date, author) => {
+        return [
+            n('h2 style="text-align:center"', title),
+            n('div style="text-align:center;color:gray;"', `${date} ${author}`)
+        ];
+    };
+
+    return {
+        paraTitle,
+        introductionPara,
+        list,
+        lr,
+        article,
+        articleTitle
+    };
+};
+
+
+/***/ }),
+/* 129 */
+/***/ (function(module, exports, __webpack_require__) {
+
+"use strict";
+
+
+let n = __webpack_require__(2);
+
+let {
+    paraTitle,
+    list,
+    lr,
+    article
+} = __webpack_require__(128)();
+
+module.exports = article({
+    title: 'performance analysis between recursive and stack-base none-recursive simulation',
+    date: '2017-09-09',
+    author: 'Arre',
+    introduction: 'In the bottom, recursive is running on the stack in memory. It\'s a top-down way to ergodic question tree. We can simulate it by using a stack to do the DFT (Depth First Traversal). How about the performance between them, what kind of conclusions we can get?'
+}, [
+    paraTitle('Experiment content'),
+    n('p', 'We prepare two simple programs. One uses recursive method, the othe uses stack-base simulation. To avoid problem like tail recursion optimization, we choose a binary tree traversal problem.'),
+
+    paraTitle('Experiment 1'),
+    n('h4', 'experiment environment'),
+    n('p', 'node v8.1.4, macOS Sierra, 8GB 1600 MHZ, 1.1 GHZ Intel Core M'),
+
+    n('h4', 'recursion version code (js)'),
+    n('pre', `var recursiveTree = (tree) => {
+    if (!tree) return 0;
+    recursiveTree(tree.left);
+    recursiveTree(tree.right);
+};
+`),
+
+    n('h4', 'stack-base simulation code (js)'),
+    n('pre', `var iterateTree = (tree) => {
+    var stack = [];
+    stack[0] = tree;
+    var topIndex = 0;
+    while (topIndex >= 0) {
+        var item = stack[topIndex--]; //pop
+
+        if (item.left) {
+            stack[++topIndex] = item.left; // push
+        }
+        if (item.right) {
+            stack[++topIndex] = item.right; // push
+        }
+    }
+};
+`),
+
+    n('h4', 'test tree'),
+    n('pre', `function TreeNode(val) {
+    this.val = val;
+    this.left = this.right = null;
+}
+
+let n = new TreeNode(0);
+let n1 = new TreeNode(1);
+let n2 = new TreeNode(2);
+let n3 = new TreeNode(3);
+n.left = n1;
+n.right= n2;
+
+n1.left = n3;
+`),
+    n('p style="font-size:14px"', '(For a more reliable result of experiment, we should try a lot of different test tree. There only enumerate one.)'),
+
+    n('h4', 'comparison result'),
+    n('pre', `stack iteration x 84,084 ops/sec ±6.83% (58 runs sampled)
+recursion x 78,480 ops/sec ±8.48% (59 runs sampled)
+Fastest is stack iteration,recursion`),
+    n('p', 'They are so close, we can think they are same fast.'),
+
+    n('h4', 'conclusion'),
+    n('p', 'In js, recursion and stack-base simulation are almost same fast. But obviously, in stack-base simulation code, the efficient of stack is a key point in performance. Js is kind of black-box in this situation, so we will continue this experiment but with some lower-level lnaguage like c++. And our concern will focus on stack.'),
+
+    paraTitle('Experiment 2'),
+    n('p', 'We use std::vector to simulate stack.'),
+    n('h4', 'experiment environment'),
+    n('p', 'g++ Apple LLVM version 8.1.0 (clang-802.0.42), macOS Sierra, 8GB 1600 MHZ, 1.1 GHZ Intel Core M'),
+
+    n('h4', 'recursion version code (c++)'),
+    n('pre', `int recursiveSum(Node *root) {
+  if (root == NULL)
+    return 0;
+  return recursiveSum(root->left) + recursiveSum(root->right) + root->val;
+}
+`),
+
+    n('h4', 'stack-base simulation code (c++)'),
+    n('pre', `int stackIterateSum(Node *root) {
+  vector<Node *> stack;
+  stack.push_back(root);
+  int sum = 0;
+
+  while (stack.size()) {
+    Node *top = stack.back();
+    stack.pop_back();
+    sum += top->val;
+
+    if (top->right != NULL) {
+      stack.push_back(top->right);
+    }
+
+    if (top->left != NULL) {
+      stack.push_back(top->left);
+    }
+  }
+
+  return sum;
+}`),
+
+    n('h4', 'test tree'),
+    n('pre', `struct Node {
+  int val;
+  Node *left;
+  Node *right;
+};
+
+Node a = {10, NULL, NULL};
+Node b = {8, NULL, NULL};
+Node c = {8, NULL, NULL};
+a.left = &b;
+a.right = &c;
+`),
+
+    n('h4', 'comparison result'),
+    n('p', 'Stack-base simulation spends almost 7x time of recursion. In other word, recursion\'s speed is 7x of stack-base simulation.'),
+
+    n('h4', 'conclusion'),
+    n('p', 'If we simply use std::vector as stack, out stack-base simulation program will be slow.'),
+    n('strong', 'The question is can we write stack-base simulation code which fast than recursion.'),
+
+    n('Experiment 3'),
+    n('p', 'Let\'s just change the stack-base simulation code from experiment 2. This time we use array, and we allocate memory at first (once).'),
+
+    n('h4', 'stack-base simulation code (c++)'),
+    n('p', 'We use array to simulate stack, we know the stack depth is less than 100, so, we simply allocate 100 size for array.'),
+    n('pre', `int stackIterateSum(Node *root) {
+  Node * stack[100];
+  stack[0] = root;
+  int stackIndex = 0;
+  int sum = 0;
+
+  while (stackIndex >= 0) {
+    Node *top = stack[stackIndex--];
+    sum += top->val;
+
+    if (top->right != NULL) {
+      stack[++stackIndex] = top->right;
+    }
+
+    if (top->left != NULL) {
+      stack[++stackIndex] = top->left;
+    }
+  }
+
+  return sum;
+}
+`),
+    n('h4', 'comparison result'),
+    n('p', 'This time, stack-base simulation is faster, and the speed is 3.6x of recursion.'),
+
+    paraTitle('Conclusion'),
+    list([
+        'In js, stack-base simulation and recursion is the same fast. (array simulates stack)',
+        'The key point to make stack-base simulation fater than recursion is to find a better stack for you problem.',
+        'In lower-level language which can control memeory, if we know the depth of recursion, we can use an array to simulate stack. We allocate memery at first (this trick will avoid multiple times memory allocating.). This kind of stack-simulation will be fast. If we want to rewrite a recursion code for better performance, we can use this trick.'
+    ])
+]);
 
 
 /***/ })
