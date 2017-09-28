@@ -22,9 +22,10 @@
     "homepage": "https://github.com/LoveKino/LoveKino.github.io#readme",
     "devDependencies": {
         "marked": "^0.3.6",
+        "uglifyjs-webpack-plugin": "^1.0.0-beta.1",
         "webpack": "^3.5.6"
     },
     "dependencies": {
-        "kabanery-lumine": "0.0.43"
+        "kabanery-lumine": "0.0.44"
     }
 }
