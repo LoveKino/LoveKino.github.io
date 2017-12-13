@@ -1,6 +1,6 @@
 'use strict';
 
-const Uglify = require("uglifyjs-webpack-plugin");
+const Uglify = require('uglifyjs-webpack-plugin');
 
 module.exports = {
     entry: {

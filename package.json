@@ -6,7 +6,8 @@
     "scripts": {
         "test": "echo \"Error: no test specified\" && exit 1",
         "watch": "webpack --watch",
-        "build": "rm -rf assets && webpack"
+        "build": "rm -rf assets && webpack",
+        "local-server": "python -m SimpleHTTPServer 4111"
     },
     "repository": {
         "type": "git",
@@ -22,11 +23,10 @@
     },
     "homepage": "https://github.com/LoveKino/LoveKino.github.io#readme",
     "devDependencies": {
-        "marked": "^0.3.6",
         "uglifyjs-webpack-plugin": "^1.0.0-beta.1",
         "webpack": "^3.5.6"
     },
     "dependencies": {
-        "kabanery-lumine": "0.0.44"
+        "kabanery-lumine": "0.0.63"
     }
 }
