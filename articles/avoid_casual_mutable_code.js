@@ -102,13 +102,3 @@ const curryFun = (fn, vs, restLen) => {
 };
 `)
 ]);
-    
-const hignFun = (fn, vs, restLen) => {
-    ......
-    return (...args) => {
-        const nextVs = vs.concat(args); // do not change vs.
-    OR
-        vs = vs.concat(args); // change vs.
-        ......
-    };
-};
